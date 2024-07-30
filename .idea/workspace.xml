@@ -5,18 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e72efb64-6e48-4333-a361-cb5429201359" name="Changes" comment="Repository initialization">
-      <change afterPath="$PROJECT_DIR$/src/npycli/cli.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/npycli/command.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/npycli/errors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/npycli/kwarg_alasing.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/npycli/parsing.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/sum_cli.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/sum_prompt.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tests/user_items_prompt.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/npycli.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/npycli.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/npycli/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/npycli/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/npycli/command.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/npycli/command.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/user_items_prompt.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/user_items_prompt.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -33,6 +25,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -47,12 +42,19 @@
     "Python.sum_cli.executor": "Debug",
     "Python.sum_prompt.executor": "Debug",
     "Python.user_items_prompt.executor": "Debug",
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "dev",
-    "last_opened_file_path": "C:/Source/Repositories/Narwhalsss360/npycli/tests/sum_cli.py"
+    "last_opened_file_path": "C:/Source/Repositories/Narwhalsss360/npycli",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager" selected="Python.sum_cli">
+  <component name="RunManager" selected="Python.user_items_prompt">
     <configuration name="sum_cli" type="PythonConfigurationType" factoryName="Python">
       <module name="npycli" />
       <option name="ENV_FILES" value="" />
@@ -62,11 +64,11 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="SDK_NAME" value="Python 3.12 (npycli)" />
       <option name="WORKING_DIRECTORY" value="" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/tests/sum_cli.py" />
       <option name="PARAMETERS" value="1 2 3" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -85,11 +87,11 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="SDK_NAME" value="Python 3.12 (npycli)" />
       <option name="WORKING_DIRECTORY" value="" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/tests/sum_prompt.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -108,11 +110,11 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="" />
-      <option name="SDK_NAME" value="Python 3.12 (npycli)" />
       <option name="WORKING_DIRECTORY" value="" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/tests/user_items_prompt.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -131,7 +133,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-975db3bf15a3-31b6be0877a2-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-241.18034.82" />
+        <option value="bundled-python-sdk-5a2391486177-2887949eec09-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-233.13763.11" />
       </set>
     </attachedChunks>
   </component>
@@ -143,6 +145,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1722304387037</updated>
+      <workItem from="1722367111339" duration="874000" />
     </task>
     <task id="LOCAL-00001" summary="Repository initialization">
       <option name="closed" value="true" />
@@ -163,8 +166,14 @@
     <option name="localTasksCounter" value="3" />
     <servers />
   </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Repository initialization" />
     <option name="LAST_COMMIT_MESSAGE" value="Repository initialization" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/npycli$user_items_prompt.coverage" NAME="user_items_prompt Coverage Results" MODIFIED="1722367966347" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>

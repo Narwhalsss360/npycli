@@ -136,7 +136,7 @@ class Command:
         self._attach_self()
         self._extract_signature()
         self._generate_details()
-        self._extract_signature()
+        self._callback_futures()
 
     def _is_argument_error(self, type_error: TypeError) -> bool:
         return type_error.args[0].startswith(f'{self.function.__name__}(')

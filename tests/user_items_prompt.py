@@ -1,5 +1,6 @@
 from typing import Optional
 from npycli import CLI, Command, EmptyEntriesError, CommandDoesNotExistError
+from npycli.kwarg_alasing import alias_cmd_kwargs
 
 
 cli = CLI(title='user-items', prompt_marker='->', env={'user-items': {}})
@@ -15,6 +16,7 @@ def user_items() -> dict[str, str]:
 
 
 @cli.cmd(name='add')
+@alias_cmd_kwargs({'key': ('k',), 'value': ('v',)})
 def add_item(key: str, value: str) -> str:
     if key in user_items():
         return f'Key {key} already exists'
