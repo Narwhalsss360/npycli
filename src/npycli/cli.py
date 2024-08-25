@@ -38,7 +38,8 @@ class CLI:
     def cmd(self, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None, help: Optional[str] = None) \
             -> Callable[[Callable], Callable]:
         def decorator(function: Callable) -> Callable:
-            self.add_command(Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix))
+            self.add_command(
+                Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix))
             return function
 
         return decorator

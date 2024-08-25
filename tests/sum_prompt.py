@@ -1,6 +1,5 @@
 from npycli import CLI
 
-
 cli = CLI()
 
 

@@ -2,7 +2,6 @@ from typing import Optional
 from npycli import CLI, Command, EmptyEntriesError, CommandDoesNotExistError
 from npycli.kwarg_alasing import alias_cmd_kwargs
 
-
 cli = CLI(title='user-items', prompt_marker='->', env={'user-items': {}})
 
 
@@ -68,7 +67,8 @@ def retvals(command: Command, retval: str) -> None:
 
 @cli.errors()
 def errors(command: Optional[Command], exception: Exception) -> None:
-    print(f'Exception {exception.__class__.__name__} thrown: {exception} | {exception.args} - {f" Running command {command.name}" if command is not None else ""}')
+    print(
+        f'Exception {exception.__class__.__name__} thrown: {exception} | {exception.args} - {f" Running command {command.name}" if command is not None else ""}')
 
 
 def main() -> None:

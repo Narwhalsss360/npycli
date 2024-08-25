@@ -47,18 +47,22 @@ def extract_positionals_keywords(args: list[str], kwarg_prefix: Optional[str] = 
 
 
 def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_types: list[type],
-                  keyword_types: dict[str, type], var_args_parser: Optional[type] = None,
+                  keyword_types: dict[str, type], var_args_index: Optional[int] = None,
+                  var_args_parser: Optional[type] = None,
                   parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> tuple[list[Any], dict[str, Any]]:
     parsers = parsers or {}
     args: list[Any] = []
     kwargs: dict[str, Any] = {}
+    if var_args_index is None:
+        var_args_index: int = len(positionals)
 
-    for arg_type, arg in zip_longest(positional_types, positionals):
+    for index, (arg_type, arg) in enumerate(zip_longest(positional_types, positionals)):
         # Did not enter all positionals, but they may be optional so stop.
         if arg is None:
             break
+
         # Args are now variable args
-        if arg_type is None:
+        if arg_type is None or var_args_index <= index:
             if var_args_parser is None:
                 raise TooManyArgumentsError(
                     f'Entered {len(positionals)} positionals, but max is {len(positional_types)}.')

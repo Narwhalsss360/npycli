@@ -19,7 +19,7 @@ class Command:
     @staticmethod
     def create(function: Callable, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None,
                help: Optional[str] = None, kwarg_prefix: Optional[str] = None) -> Command:
-        return Command(function=function, names=names or ((name, ) or function.__name__), help=help,
+        return Command(function=function, names=names or ((name,) or function.__name__), help=help,
                        kwarg_prefix=kwarg_prefix)
 
     @property
@@ -42,7 +42,7 @@ class Command:
     def exec_with(self, args: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
         positionals, keywords = extract_positionals_keywords(args, self.kwarg_prefix)
         args, kwargs = parse_args_as(positionals, keywords, self._positional_types, self._keyword_types,
-                                     self._var_args_parser, parsers)
+                                     self._var_args_index, self._var_args_parser, parsers)
         try:
             return self.function(*args, **kwargs)
         except TypeError as type_error:
@@ -72,10 +72,11 @@ class Command:
         self._positional_types: list[type] = []
         self._keyword_types: dict[str, type] = {}
         self._has_var_args: bool = False
+        self._var_args_index: Optional[int] = None
         self._has_var_kwargs: bool = False
         self._var_args_parser: Optional[type] = None
 
-        for parameter in self._signature.parameters.values():
+        for index, parameter in enumerate(self._signature.parameters.values()):
             if parameter.default == parameter.empty:
                 self._required_parameters.append(parameter)
             else:
@@ -85,6 +86,7 @@ class Command:
                 self._var_args_parser = str if parameter.annotation == parameter.empty \
                     else type_from_annotation(parameter.annotation)
                 self._has_var_args = True
+                self._var_args_index = index
                 continue
             if parameter.kind == Parameter.VAR_KEYWORD:
                 self._has_var_kwargs = True
