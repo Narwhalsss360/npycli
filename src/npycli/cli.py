@@ -8,14 +8,14 @@ class CLI:
     def __init__(self, title: Optional[str] = None, prompt_marker: Optional[str] = None,
                  kwarg_prefix: Optional[str] = None, parsers: Optional[dict[type, Callable[[str], Any]]] = None,
                  env: Optional[dict] = None, retval_handler: Optional[Callable[[Command, Any], None]] = None,
-                 error_handler: Optional[Callable[[Optional[Command], Exception], None]] = None) -> None:
+                 error_handler: Optional[Callable[[Command, Exception], None]] = None) -> None:
         self.title: str = title or 'CLI'
         self.prompt_marker: str = prompt_marker or '>'
         self.kwarg_prefix: str = kwarg_prefix or '--'
         self.parsers: dict[type, Callable[[str], Any]] = parsers or {}
         self.env: dict = env or {}
         self._retval_handler: Optional[Callable[[Command, Any], None]] = retval_handler
-        self._error_handler: Optional[Callable[[Optional[Command], Exception], None]] = error_handler
+        self._error_handler: Optional[Callable[[Command, Exception], None]] = error_handler
         self._commands: list[Command] = []
 
     @property
@@ -51,9 +51,9 @@ class CLI:
 
         return decorator
 
-    def errors(self) -> Callable[[Callable[[Optional[Command], Exception], None]], Callable]:
-        def decorator(function: Callable[[Optional[Command], Exception], None]) \
-                -> Callable[[Optional[Command], Exception], None]:
+    def errors(self) -> Callable[[Callable[[Command, Exception], None]], Callable]:
+        def decorator(function: Callable[[Command, Exception], None]) \
+                -> Callable[[Command, Exception], None]:
             self._error_handler = function
             return function
 
