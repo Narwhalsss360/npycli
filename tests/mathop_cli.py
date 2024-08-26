@@ -24,4 +24,4 @@ def math_op(a: float, *nums: float, op: Optional[str] = '+') -> None:
 
 
 if __name__ == '__main__':
-    Command.create(math_op, 'op')(argv[1:])
+    Command.create(math_op, 'op', help='Perform math operation.')(argv[1:])

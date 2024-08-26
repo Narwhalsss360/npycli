@@ -109,27 +109,35 @@ class Command:
             if index != last:
                 self._details += ' '
 
-        if not self._optional_parameters and not self._required_parameters:
+        parameters = self._signature.parameters.values()
+
+        if len(parameters) == 0:
             return
 
         self._details += '\t'
+        last = len(parameters) - 1
+        for index, parameter in enumerate(self._signature.parameters.values()):
+            arg_type = str if parameter.annotation == parameter.empty else type_from_annotation(parameter.annotation)
+            if parameter.kind == Parameter.VAR_POSITIONAL:
+                self._details += '<*'
+            elif parameter.kind == Parameter.VAR_KEYWORD:
+                self._details += '<**'
+            else:
+                self._details += '<'
+            self._details += parameter.name
 
-        last = len(self._required_parameters) - 1
-        for index, required in enumerate(self._required_parameters):
-            self._details += f'<{required.name}: {"str" if required.annotation == required.empty else type_from_annotation(required.annotation).__name__}>'
+            if parameter.default != parameter.empty:
+                self._details += '?'
+            if arg_type == str:
+                self._details += '>'
+            else:
+                self._details += f': {arg_type.__name__}>'
+
             if index != last:
                 self._details += ' '
 
-        last = len(self._optional_parameters) - 1
-        for index, optional in enumerate(self._optional_parameters):
-            self._details += f'<{optional.name}?: {"str" if optional.annotation == optional.empty else type_from_annotation(optional.annotation).__name__}>'
-            if index != last:
-                self._details += ' '
-
-        if self._has_var_args:
-            self._details += f'\t<*args: {"str" if self._var_args_parser is None else self._var_args_parser.__name__}>'
-        if self._has_var_kwargs:
-            self._details += f'\t<**kwargs>'
+        if self.help.strip() != '':
+            self._details += f'\t{self.help}'
 
     def _callback_futures(self) -> None:
         if not hasattr(self.function, Command.__FUTURE_CMD_ATTR__):
