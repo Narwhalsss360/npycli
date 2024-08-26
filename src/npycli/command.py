@@ -59,6 +59,10 @@ class Command:
             raise TypeError(f'{Command} names must be a {tuple} of {str}.')
         if not self.names:
             raise ValueError(f'{Command} names must not be empty.')
+        for name in self.names:
+            for c in name:
+                if c.isspace():
+                    raise ValueError(f'Name for {self.function} cannot contain whitespace: {name}')
         if self.help is not None and not isinstance(self.help, str):
             raise TypeError(f'{Command} help must be a {str}.')
 
