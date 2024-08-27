@@ -20,7 +20,7 @@ def parse_kwarg_aliases(kwargs: dict[str, Any], aliases: dict[str, tuple[str, ..
     parsed_kwargs = {}
     for kwarg, value in kwargs.items():
         for original_kwarg, original_kwarg_aliases in aliases.items():
-            if kwarg in original_kwarg_aliases:
+            if kwarg in original_kwarg_aliases or original_kwarg == kwarg:
                 parsed_kwargs[original_kwarg] = value
                 break
     return parsed_kwargs
