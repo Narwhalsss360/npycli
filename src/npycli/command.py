@@ -19,27 +19,69 @@ class Command:
     @staticmethod
     def create(function: Callable, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None,
                help: Optional[str] = None, kwarg_prefix: Optional[str] = None) -> Command:
+        """
+        Create a Command, wrapper for using either `name` or `names`
+        :param function: Function to execute `Command` with.
+        :param name: Name of `Command`
+        :param names: Name and aliases of `Command`. *Cannot be used with `name`*
+        :param help: Help string
+        :param kwarg_prefix: Prefix of argument to represent next argument is the value of this argument's keyword
+        :return: Created `Command`
+        """
+
         return Command(function=function, names=names or ((name,) or function.__name__), help=help,
                        kwarg_prefix=kwarg_prefix)
 
     @property
     def name(self) -> str:
+        """
+        Primary name of this `Command`
+        :return: Name
+        """
+
         return self.names[0]
 
     @property
     def aliases(self) -> tuple[str]:
+        """
+        Aliases of this `Command`
+        :return: Aliases
+        """
+
         return self.names[1:]
 
     @property
     def details(self) -> str:
+        """
+        Details of this command, which include but are not limited to:
+        * Name
+        * Aliases
+        * Arguments
+        * Help string
+        :return: Details
+        """
+
         return self._details
 
     def add_detail(self, detail: str) -> None:
+        """
+        Add details to this `Command`
+        :param detail: Specific detail
+        :return: `None`
+        """
+
         if not self._details[-1] == '\t':
             self._details += '\t'
         self._details += detail
 
     def exec_with(self, args: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
+        """
+        Execute this `Command` with specified arguments and parsers
+        :param args: Arguments
+        :param parsers: Custom parsers to parse arguments with.
+        :return:
+        """
+
         positionals, keywords = extract_positionals_keywords(args, self.kwarg_prefix)
         args, kwargs = parse_args_as(positionals, keywords, self._positional_types, self._keyword_types,
                                      self._var_args_index, self._var_args_parser, parsers)

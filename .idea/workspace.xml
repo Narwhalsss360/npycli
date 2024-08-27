@@ -4,10 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e72efb64-6e48-4333-a361-cb5429201359" name="Changes" comment="Added documentation and samples">
+    <list default="true" id="e72efb64-6e48-4333-a361-cb5429201359" name="Changes" comment="Get help from doc string if no help was supplied">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/npycli/cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/npycli/cli.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/npycli/command.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/npycli/command.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/sum_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/tests/sum_cli.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -281,7 +281,15 @@
       <option name="project" value="LOCAL" />
       <updated>1724723838236</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Get help from doc string if no help was supplied">
+      <option name="closed" value="true" />
+      <created>1724724141812</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1724724141812</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -294,23 +302,8 @@
     <MESSAGE value="**FIX**: Added crucial missing logic to kwarg aliasing that was discarding kwarg if it was original." />
     <MESSAGE value="Added check to make sure that a function is made as a command twice." />
     <MESSAGE value="Added documentation and samples" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added documentation and samples" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/tests/sum_cli.py</url>
-          <line>13</line>
-          <option name="timeStamp" value="4" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/src/npycli/command.py</url>
-          <line>140</line>
-          <option name="timeStamp" value="5" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <MESSAGE value="Get help from doc string if no help was supplied" />
+    <option name="LAST_COMMIT_MESSAGE" value="Get help from doc string if no help was supplied" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/npycli$user_items_prompt.coverage" NAME="user_items_prompt Coverage Results" MODIFIED="1722367966347" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
