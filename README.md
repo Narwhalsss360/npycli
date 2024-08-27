@@ -1,6 +1,6 @@
 # npycli
 
-A library to create fast and east cli programs.
+A library to create fast and easy cli programs.
 
 Programs contain either one or many *commands*. a command is represented by
 the type `Command`.  
@@ -16,5 +16,6 @@ is a `list` of arguments, the first being the name of a `Command`.
 See more [documentation](./docs).
 
 # See [examples](./examples):
+
 * [Simple single command program that sums numbers](./examples/summation.py)
 * [Multiple command program that uses a `dict` to manage user key-value pairs](./examples/user_items.py)
