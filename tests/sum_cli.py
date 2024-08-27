@@ -3,6 +3,10 @@ from npycli import Command
 
 
 def main(*nums: int) -> None:
+    """
+    Sum numbers together.
+    :param nums: Numbers to sum.
+    """
     print(sum(nums))
 
 

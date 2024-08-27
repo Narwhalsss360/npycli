@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Callable, Optional, Any
 from dataclasses import dataclass, field
-from inspect import signature, Signature, Parameter
+from inspect import signature, Signature, Parameter, getdoc
 from .errors import ParsingError, CommandArgumentError
 from .parsing import type_from_annotation, extract_positionals_keywords, parse_args_as
 
@@ -138,7 +138,9 @@ class Command:
             if index != last:
                 self._details += ' '
 
-        if self.help.strip() != '':
+        if self.help is None or self.help.strip() == '':
+            self.help = getdoc(self.function)
+        else:
             self._details += f'\t{self.help}'
 
     def _callback_futures(self) -> None:
