@@ -13,4 +13,4 @@ license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
-version = "0.0.0"
+version = "0.1.0"
