@@ -63,6 +63,8 @@ class Command:
             for c in name:
                 if c.isspace():
                     raise ValueError(f'Name for {self.function} cannot contain whitespace: {name}')
+        if getattr(self.function, Command.__CMD_ATTR__, None) is not None:
+            raise TypeError(f'Function {self.function} is already a {Command}.')
         if self.help is not None and not isinstance(self.help, str):
             raise TypeError(f'{Command} help must be a {str}.')
 
