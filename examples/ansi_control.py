@@ -2,7 +2,7 @@ from io import StringIO
 from npycli.ansi import (
     send_ansi,
     SAVE_CURRENT_CURSOR_POSITION,
-    SCROLL_DOWN,
+    CURSOR_DOWN,
     CURSOR_UP,
     INSERT_NEW_LINE,
     RESTORE_SAVED_CURRENT_CURSOR_POSITION,
@@ -29,19 +29,20 @@ def print_above(*args, **kwargs) -> None:
     line_count: int = output.count('\n') + 1
 
     send_ansi(SAVE_CURRENT_CURSOR_POSITION)
-
     if current_is_empty:
-        send_ansi(CURSOR_UP)
-    # These ansi control commands may be supplied with arguments
-    send_ansi(SCROLL_DOWN.with_args(line_count))
-    send_ansi(CURSOR_UP.with_args(line_count))
+        print()
+        send_ansi(CURSOR_UP.with_args(2))
 
+    # These ansi control commands may be supplied with arguments
+    print()
+    send_ansi(CURSOR_UP.with_args(line_count))
     # This one doesn't have argument, so we just repeat the command
     send_ansi(INSERT_NEW_LINE, repeat=line_count)
 
     # Flush, just in case current cursor position gets moved after output
     print(output, end='', flush=True)
     send_ansi(RESTORE_SAVED_CURRENT_CURSOR_POSITION)
+    send_ansi(CURSOR_DOWN.with_args(line_count))
 
 
 # Prints in order
