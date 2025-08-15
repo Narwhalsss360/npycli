@@ -1,9 +1,11 @@
-from typing import Optional, Any, TextIO
+from types import FrameType
+from typing import Optional, Any, IO
 from os.path import isfile
 from math import ceil
 import json
 from npycli import CLI, Command, CLIError, EmptyEntriesError
 from npycli.command import cmd
+from npycli.errors import CommandDoesNotExistError
 from npycli.kwarg_alasing import alias_cmd_kwargs
 
 USER_ITEMS_FILE = 'user-items.gitignore.json'
@@ -12,7 +14,7 @@ TAB_WIDTH: int = 4
 cli = CLI('user-items')
 
 
-def open_user_items_file(mode: str) -> TextIO:
+def open_user_items_file(mode: str) -> IO:
     return open(USER_ITEMS_FILE, mode, encoding='utf-8')
 
 
@@ -91,7 +93,9 @@ def help_cmd(command_name: Optional[str] = None) -> str:
         for command in cli.commands:
             result += f'{command}\n'
     else:
-        return cli.get_command(command_name).details.replace('\t', '\n')
+        if (command := cli.get_command(command_name)) is None:
+            raise CommandDoesNotExistError(f"{command_name} is not a command")
+        return command.details.replace('\t', '\n')
     return result
 
 
@@ -112,7 +116,7 @@ def as_prompter() -> None:
     while True:
         try:
             cli.prompt()
-        except EmptyEntriesError as empty:  # If the user entered nothing, just continue
+        except EmptyEntriesError:  # If the user entered nothing, just continue
             pass
         except CLIError as err:  # Catch errors that occur between here and execution of command
             print(f'{err.__class__.__name__}: {err.args[0]}')
@@ -123,7 +127,7 @@ def as_cli_program() -> None:
     from sys import argv
     try:
         cli.exec(argv[1:])
-    except EmptyEntriesError as empty:  # If the user entered nothing, just continue
+    except EmptyEntriesError:  # If the user entered nothing, just continue
         pass
     except CLIError as err:  # Catch errors that occur between here and execution of command
         print(f'{err.__class__.__name__}: {err.args[0]}')
@@ -133,7 +137,7 @@ if __name__ == '__main__':
     from inspect import currentframe, getframeinfo
 
     print(
-        f'Comment/uncomment a function below (line {getframeinfo(currentframe()).lineno}) to use to select the style of program.',
+        f'Comment/uncomment a function below (line {getframeinfo(currentframe() or FrameType()).lineno}) to use to select the style of program.',
         end='')
 
     # This function will use the arguments passed into `argv` as arguments.

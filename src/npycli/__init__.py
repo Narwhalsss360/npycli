@@ -12,13 +12,13 @@ from .errors import (
 
 
 __all__ = [
-    CLI,
-    Command,
-    ParsingError,
-    MissingKeywordArgumentValueError,
-    TooManyArgumentsError,
-    CLIError,
-    EmptyEntriesError,
-    CommandDoesNotExistError,
-    CommandArgumentError
+    "CLI",
+    "Command",
+    "ParsingError",
+    "MissingKeywordArgumentValueError",
+    "TooManyArgumentsError",
+    "CLIError",
+    "EmptyEntriesError",
+    "CommandDoesNotExistError",
+    "CommandArgumentError"
 ]

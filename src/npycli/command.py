@@ -12,7 +12,7 @@ class Command:
     __FUTURE_CMD_ATTR__ = '__future_cmd__'
 
     function: Callable
-    names: tuple[str]
+    names: tuple[str, ...]
     help: Optional[str] = field(default=None)
     kwarg_prefix: str = field(default_factory=lambda: '--')
 
@@ -29,8 +29,14 @@ class Command:
         :return: Created `Command`
         """
 
-        return Command(function=function, names=names or ((name,) or function.__name__), help=help,
-                       kwarg_prefix=kwarg_prefix)
+        if names is None:
+            if name:
+                names = name,
+            else:
+                names = function.__name__,
+
+        return Command(function=function, names=names, help=help,
+                       kwarg_prefix=kwarg_prefix or "--")
 
     @property
     def name(self) -> str:
@@ -42,7 +48,7 @@ class Command:
         return self.names[0]
 
     @property
-    def aliases(self) -> tuple[str]:
+    def aliases(self) -> tuple[str, ...]:
         """
         Aliases of this `Command`
         :return: Aliases
@@ -97,7 +103,7 @@ class Command:
     def _validate_data(self) -> None:
         if not callable(self.function):
             raise TypeError(f'{Command._validate_data} -> {self.function} is not callable.')
-        if not isinstance(self.names, tuple) and not all(isinstance(name, str) for name in self.names):
+        if not isinstance(self.names, tuple) or not all(isinstance(name, str) for name in self.names):
             raise TypeError(f'{Command} names must be a {tuple} of {str}.')
         if not self.names:
             raise ValueError(f'{Command} names must not be empty.')
@@ -140,7 +146,7 @@ class Command:
                 self._has_var_kwargs = True
                 continue
 
-            parameter_type: type = str if parameter.annotation == parameter.empty \
+            parameter_type: type= str if parameter.annotation == parameter.empty \
                 else type_from_annotation(parameter.annotation)
             self._positional_types.append(parameter_type)
             self._keyword_types[parameter.name] = parameter_type
@@ -208,14 +214,14 @@ class Command:
         return self.details
 
 
-def cmd(function: Callable) -> Optional[Command]:
-    if hasattr(function, Command.__CMD_ATTR__):
-        return getattr(function, Command.__CMD_ATTR__)
-    return None
-
-
 def is_cmd(function: Callable) -> bool:
-    return cmd(function) is not None
+    return hasattr(function, Command.__CMD_ATTR__)
+
+
+def cmd(function: Callable) -> Command:
+    if is_cmd(function):
+        return getattr(function, Command.__CMD_ATTR__)
+    raise ValueError(f"{function} is not a command. Use {is_cmd}.")
 
 
 def future_cmd(function: Callable, callback: Callable[[Command], None]) -> None:

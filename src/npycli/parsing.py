@@ -4,7 +4,7 @@ from itertools import zip_longest
 from .errors import MissingKeywordArgumentValueError, TooManyArgumentsError
 
 
-def type_from_annotation(annotation: str) -> type | None:
+def type_from_annotation(annotation: str) -> type:
     args = get_args(annotation)
     if args:
         annotation = args[0]
@@ -15,11 +15,9 @@ def type_from_annotation(annotation: str) -> type | None:
     try:
         return getattr(builtins, annotation)
     except AttributeError:
-        try:
-            t = globals()[annotation]
-        except KeyError:
-            return None
-        return t if isinstance(t, type) else None
+        if (t := globals().get(annotation)):
+            return t
+    raise TypeError(f"Type {annotation} not found.")
 
 
 def extract_positionals_keywords(args: list[str], kwarg_prefix: Optional[str] = None) -> \
@@ -54,7 +52,8 @@ def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_t
     args: list[Any] = []
     kwargs: dict[str, Any] = {}
     if var_args_index is None:
-        var_args_index: int = len(positionals)
+        var_args_index = len(positionals)
+        assert var_args_index is not None
 
     for index, (arg_type, arg) in enumerate(zip_longest(positional_types, positionals)):
         # Did not enter all positionals, but they may be optional so stop.

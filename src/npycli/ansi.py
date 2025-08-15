@@ -1,4 +1,5 @@
-from typing import Self, Optional
+from __future__ import annotations
+from typing import Optional
 from dataclasses import dataclass, field, asdict
 
 
@@ -12,7 +13,7 @@ class ANSIControl:
     no_of_default_arguments: int = field(default=0)
 
     @staticmethod
-    def send(ansi_control: Self | str, repeat: int = 1) -> None:
+    def send(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
         if isinstance(ansi_control, ANSIControl):
             for _ in range(repeat):
                 print(str(ansi_control), end='', flush=True)
@@ -30,12 +31,12 @@ class ANSIControl:
         return self._with_no_args is not None
 
     @property
-    def with_no_args(self) -> Self:
+    def with_no_args(self) -> ANSIControl:
         if self._with_no_args is None:
             return self
         return self._with_no_args
 
-    def with_args(self, *args) -> Self:
+    def with_args(self, *args) -> ANSIControl:
         if self.has_args:
             return self
 
@@ -58,8 +59,15 @@ class ANSIControl:
         with_args._with_no_args = self
         return with_args
 
-    def __call__(self, *args, repeat: int = 1):
-        ANSIControl.send((self._with_no_args if self.has_args else self).with_args(*args), repeat)
+    def __call__(self, *args, repeat: int = 1) -> ANSIControl:
+        if self.has_args:
+            assert self._with_no_args is not None
+            replaced_args: ANSIControl = self._with_no_args.with_args(*args)
+            ANSIControl.send(replaced_args, repeat)
+            return replaced_args
+        else:
+            ANSIControl.send(self.with_args(*args), repeat)
+            return self
 
     def __str__(self) -> str:
         if not self.has_args:

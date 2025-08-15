@@ -10,7 +10,7 @@ def product(nums: tuple[float]) -> float:
     return p
 
 
-ops: dict[str, Callable[[...], float]] = {
+ops: dict[str, Callable[..., float]] = {
     '+': sum,
     '*': product
 }
