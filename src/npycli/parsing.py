@@ -1,7 +1,7 @@
 import builtins
 from typing import Optional, Any, Callable, get_args
 from itertools import zip_longest
-from .errors import MissingKeywordArgumentValueError, TooManyArgumentsError
+from .errors import MissingKeywordArgumentValueError, ParsingError, TooManyArgumentsError
 
 
 def type_from_annotation(annotation: str) -> type:
@@ -46,7 +46,7 @@ def extract_positionals_keywords(args: list[str], kwarg_prefix: Optional[str] = 
 
 def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_types: list[type],
                   keyword_types: dict[str, type], var_args_index: Optional[int] = None,
-                  var_args_parser: Optional[type] = None,
+                  var_args_parser: Optional[type | Callable[[str], Any]] = None,
                   parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> tuple[list[Any], dict[str, Any]]:
     parsers = parsers or {}
     args: list[Any] = []
@@ -65,12 +65,28 @@ def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_t
             if var_args_parser is None:
                 raise TooManyArgumentsError(
                     f'Entered {len(positionals)} positionals, but max is {len(positional_types)}.')
-            args.append(var_args_parser(arg))
+            try:
+                args.append(var_args_parser(arg))
+            except ParsingError as parsing_error:
+                raise parsing_error
+            except Exception as exc:
+                raise ParsingError(f"An error ({repr(exc)}) occurred parsing '{arg}' as {arg_type}.") from exc
             continue
-        args.append(parsers[arg_type](arg) if arg_type in parsers else arg_type(arg))
+
+        try:
+            args.append(parsers[arg_type](arg) if arg_type in parsers else arg_type(arg))
+        except ParsingError as parsing_error:
+            raise parsing_error
+        except Exception as exc:
+            raise ParsingError(f"An error ({repr(exc)}) occurred parsing '{arg}' as {arg_type}.") from exc
 
     for kwarg, arg in keywords.items():
         arg_type: type = keyword_types.get(kwarg, str)
-        kwargs[kwarg] = parsers[arg_type](arg) if arg_type in parsers else arg_type(arg)
+        try:
+            kwargs[kwarg] = parsers[arg_type](arg) if arg_type in parsers else arg_type(arg)
+        except ParsingError as parsing_error:
+            raise parsing_error
+        except Exception as exc:
+            raise ParsingError(f"An error ({repr(exc)}) occurred parsing '{arg}' as {arg_type}.") from exc
 
     return args, kwargs
