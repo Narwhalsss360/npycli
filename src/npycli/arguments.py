@@ -129,6 +129,16 @@ class CommandParameter:
 
         return parameter
 
+    @property
+    def is_plain(self) -> bool:
+        return (
+            self.annotation_preview is CommandParameter.DEFAULT_STR and
+            self.argument_types is CommandParameter.DEFAULT_ARG_TYPES and
+            self.default_preview is CommandParameter.DEFAULT_STR and
+            self.description is CommandParameter.DEFAULT_STR and
+            self.parse_hooks is None
+        )
+
 
 def main() -> None:
     parameter: CommandParameter = CommandParameter.build(
