@@ -175,15 +175,15 @@ class Command:
             if index != last:
                 self._details += ' '
 
-        parameters = self._signature.parameters.values()
+        parameters = self._parameters
 
         if len(parameters) == 0:
             return
 
         self._details += '\t'
         last = len(parameters) - 1
-        for index, parameter in enumerate(self._signature.parameters.values()):
-            arg_type = str if parameter.annotation == parameter.empty else type_from_annotation(parameter.annotation)
+        for index, parameter in enumerate(self._parameters):
+            arg_type = parameter.argument_types[0]
             if parameter.kind == Parameter.VAR_POSITIONAL:
                 self._details += '<*'
             elif parameter.kind == Parameter.VAR_KEYWORD:
