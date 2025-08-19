@@ -1,9 +1,11 @@
 from __future__ import annotations
 from typing import Callable, Optional, Any
 from dataclasses import dataclass, field
-from inspect import signature, Signature, Parameter, getdoc
+from inspect import signature, Signature, Parameter, getdoc, get_annotations
+
+from .parameters import CommandParameter, parse_parameters
 from .errors import ParsingError, CommandArgumentError
-from .parsing import type_from_annotation, extract_positionals_keywords, parse_args_as
+from .parsing import type_from_annotation
 
 
 @dataclass
@@ -69,6 +71,10 @@ class Command:
 
         return self._details
 
+    @property
+    def parameters(self) -> list[CommandParameter]:
+        return self._parameters
+
     def add_detail(self, detail: str) -> None:
         """
         Add details to this `Command`
@@ -80,7 +86,7 @@ class Command:
             self._details += '\t'
         self._details += detail
 
-    def exec_with(self, args: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
+    def exec_with(self, entries: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
         """
         Execute this `Command` with specified arguments and parsers
         :param args: Arguments
@@ -88,9 +94,10 @@ class Command:
         :return:
         """
 
-        positionals, keywords = extract_positionals_keywords(args, self.kwarg_prefix)
-        args, kwargs = parse_args_as(positionals, keywords, self._positional_types, self._keyword_types,
-                                     self._var_args_index, self._var_args_parser, parsers)
+#        positionals, keywords = extract_positionals_keywords(args, self.kwarg_prefix)
+#        args, kwargs = parse_args_as(positionals, keywords, self._positional_types, self._keyword_types,
+#                                     self._var_args_index, self._var_args_parser, parsers)
+        args, kwargs = parse_parameters(self._parameters, entries, self.kwarg_prefix, self.kwarg_prefix, parsers or {})
         try:
             return self.function(*args, **kwargs)
         except TypeError as type_error:
@@ -129,25 +136,34 @@ class Command:
         self._var_args_index: Optional[int] = None
         self._has_var_kwargs: bool = False
         self._var_args_parser: Optional[type] = None
+        self._parameters: list[CommandParameter] = []
+
+        annotations: dict[str, Any] = get_annotations(self.function)
 
         for index, parameter in enumerate(self._signature.parameters.values()):
+            self._parameters.append(
+                CommandParameter.build(
+                    parameter.name,
+                    parameter.kind,
+                    annotations[parameter.name],
+                    default=parameter.default
+                )
+            )
+
             if parameter.default == parameter.empty:
                 self._required_parameters.append(parameter)
             else:
                 self._optional_parameters.append(parameter)
 
             if parameter.kind == Parameter.VAR_POSITIONAL:
-                self._var_args_parser = str if parameter.annotation == parameter.empty \
-                    else type_from_annotation(parameter.annotation)
-                self._has_var_args = True
+                self._var_args_parser = self._parameters[-1].argument_types[0]
                 self._var_args_index = index
                 continue
             if parameter.kind == Parameter.VAR_KEYWORD:
                 self._has_var_kwargs = True
                 continue
 
-            parameter_type: type= str if parameter.annotation == parameter.empty \
-                else type_from_annotation(parameter.annotation)
+            parameter_type: type = self._parameters[-1].argument_types[0]
             self._positional_types.append(parameter_type)
             self._keyword_types[parameter.name] = parameter_type
 
