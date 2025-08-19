@@ -1,6 +1,7 @@
 from __future__ import annotations
+from types import UnionType
 from typing import Callable, Any, Annotated, Optional, Union, get_origin, get_args
-from inspect import _ParameterKind, Parameter
+from inspect import _ParameterKind, Parameter, get_annotations
 from dataclasses import dataclass, field
 
 
@@ -72,6 +73,7 @@ class ParseHooks:
 
 @dataclass
 class CommandParameter:
+    UNPARSED = object()
     DEFAULT_ARG_TYPES = (str,)
     DEFAULT_STR = ""
     empty = Parameter.empty
@@ -108,11 +110,8 @@ class CommandParameter:
             else:
                 if isinstance(annotation, type):
                     parameter.argument_types = (annotation,)
-                elif get_origin(annotation) == Union:
-                    parameter.argument_types = ()
-                    for arg in get_args(annotation):
-                        if isinstance(arg, type):
-                            parameter.argument_types = (arg,) + parameter.argument_types
+                elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
+                    parameter.argument_types = tuple(arg for arg in get_args(annotation) if isinstance(arg, type))
                 else:
                     raise TypeError(f"{annotation} is unsupported")
 
@@ -128,6 +127,10 @@ class CommandParameter:
             parameter.names = (name,)
 
         return parameter
+
+    @property
+    def name(self) -> str:
+        return self.names[0]
 
     @property
     def is_plain(self) -> bool:
