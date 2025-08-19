@@ -44,6 +44,9 @@ def alias_cmd_kwargs(aliases: dict[str, tuple[str, ...]]) -> Callable[[Callable]
         def add_detail(command: Command) -> None:
             for kwarg, kwarg_aliases in aliases.items():
                 command.add_detail(f'{kwarg}<->{kwarg_aliases}')
+                parameter = next(filter(lambda p: p.name == kwarg, command.parameters), None)
+                assert parameter is not None, f"{kwarg} is not a parameter, cannot alias."
+                parameter.names = parameter.names + kwarg_aliases
 
         future_cmd(func, add_detail)
         attach_kwarg_aliases(func, aliases)
