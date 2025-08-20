@@ -103,6 +103,7 @@ class CommandParameter:
 
     def __post_init__(self) -> None:
         self._custom_attributes: dict[str, Any] = {}
+        self._validate_data()
 
     @staticmethod
     def build(name: str, kind: ParameterKind, annotation: Any, default: Any = empty) -> CommandParameter:
@@ -144,6 +145,7 @@ class CommandParameter:
         if parameter.names is DEFAULT_NAMES:
             parameter.names = (name,)
 
+        parameter._validate_data()
         return parameter
 
     @property
@@ -171,6 +173,10 @@ class CommandParameter:
 
     def remove_custom_attribute(self, key: str) -> Any:
         return self._custom_attributes.pop(key)
+
+    def _validate_data(self) -> None:
+        assert len(self.names), "Parameters must have at least 1 name"
+        assert len(self.argument_types), "Parameters must have at least 1 type"
 
 
 def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type, Callable[[str], Any]]) -> Any:
