@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import UnionType
-from typing import Callable, Any, Annotated, Union, get_origin, get_args
+from typing import Callable, Any, Annotated, Type, Union, get_origin, get_args, cast
 from inspect import _ParameterKind, Parameter
 from dataclasses import dataclass, field
 
@@ -84,6 +84,10 @@ class CustomAttrbute:
         return repr(self)
 
 
+ContainerTypes = (list | tuple)
+CONTAINER_TYPES: tuple[type, ...] = list, tuple
+
+
 @dataclass
 class CommandParameter:
     UNPARSED = object()
@@ -103,6 +107,8 @@ class CommandParameter:
 
     def __post_init__(self) -> None:
         self._custom_attributes: dict[str, Any] = {}
+        self._container_annotation: Any | None = None
+        self._private_name: str | None = None
         self._validate_data()
 
     @staticmethod
@@ -116,6 +122,7 @@ class CommandParameter:
             if is_metadata:
                 if isinstance(annotation, Alias):
                     parameter.names = (() if annotation.private else (name,)) + annotation.aliases
+                    parameter._private_name = name
                 elif isinstance(annotation, Description):
                     parameter.description = annotation.description
                 elif isinstance(annotation, AnnotationPreview):
@@ -129,6 +136,10 @@ class CommandParameter:
             else:
                 if isinstance(annotation, type):
                     parameter.argument_types = (annotation,)
+                elif (origin := get_origin(annotation)) in CONTAINER_TYPES:
+                    assert kind == ParameterKind.KEYWORD_ONLY, f"A container argument type must be {ParameterKind.KEYWORD_ONLY}"
+                    parameter.argument_types = (origin,)
+                    parameter._container_annotation = annotation
                 elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
                     parameter.argument_types = tuple(arg for arg in get_args(annotation) if isinstance(arg, type))
                 else:
@@ -153,6 +164,10 @@ class CommandParameter:
         return self.names[0]
 
     @property
+    def private_name(self) -> str:
+        return self._private_name or self.names[0]
+
+    @property
     def is_plain(self) -> bool:
         return (
             self.annotation_preview is CommandParameter.DEFAULT_STR and
@@ -169,6 +184,18 @@ class CommandParameter:
     @property
     def argument_type(self) -> type:
         return self.argument_types[0]
+
+    @property
+    def container_type(self) -> Type[ContainerTypes] | None:
+        if self._container_annotation is None:
+            return None
+        return get_origin(self._container_annotation)
+
+    @property
+    def item_types(self) -> tuple[type, ...] | None:
+        if self._container_annotation is None:
+            return None
+        return get_args(self._container_annotation) or (str,)
 
     def add_custom_attribute(self, key: str, value: Any, overwrite: bool = False) -> None:
         if not overwrite and key in self._custom_attributes:
@@ -195,7 +222,12 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type
     parsed: Any = CommandParameter.UNPARSED
     entry = pre(entry)
     for i, t in enumerate(parameter.argument_types):
-        parser: Callable = parsers.get(t, t)
+        if t in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
+            assert len(item_types) == 1, "Only one item type is currently supported"
+            parser: Callable = parsers.get(item_types[0], item_types[0])
+        else:
+            parser: Callable = parsers.get(t, t)
+
         try:
             parsed = parser(entry)
             break
@@ -215,6 +247,22 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type
             break
 
     return post(parsed)
+
+
+def add_to_container_type(container_type: Type[ContainerTypes], current: ContainerTypes | None, parsed: Any) -> ContainerTypes:
+    if container_type == list:
+        if current is None:
+            return [parsed]
+        assert isinstance(current, list)
+        current.append(parsed)
+        return current
+    elif container_type == tuple:
+        if current is None:
+            return (parsed,)
+        assert isinstance(current, tuple)
+        return current + (parsed,)
+    else:
+        raise ValueError(f"'container_type' must be of either {CONTAINER_TYPES}")
 
 
 def parse_parameters(
@@ -263,8 +311,16 @@ def parse_parameters(
             continue
 
         if keyword_parameter is not None:
-            keyword_arguments[keyword_parameter.name] = parse_with_hooks(keyword_parameter, entry, parsers)
-            keyword_parameter = None
+            if (container_type := keyword_parameter.container_type) is not None:
+                keyword_arguments[keyword_parameter.private_name] = add_to_container_type(
+                    container_type,
+                    keyword_arguments.get(keyword_parameter.private_name, None),
+                    parse_with_hooks(keyword_parameter, entry, parsers)
+                )
+                keyword_parameter = None
+            else:
+                keyword_arguments[keyword_parameter.private_name] = parse_with_hooks(keyword_parameter, entry, parsers)
+                keyword_parameter = None
             continue
 
         if var_kwarg is not None:
@@ -297,12 +353,12 @@ def parse_parameters(
                 continue
             if len(arguments) > i:
                 continue
-            if parameter.name not in keyword_arguments:
+            if parameter.private_name not in keyword_arguments:
                 raise NotImplementedError(f"Missing required keyword/positional '{parameter.name}'")
         if parameter.default != parameter.empty or parameter.kind in (ParameterKind.VAR_POSITIONAL, ParameterKind.VAR_KEYWORD):
             continue
 
-        if parameter.name not in keyword_arguments:
+        if parameter.private_name not in keyword_arguments:
             raise NotImplementedError(f"Missing required keyword '{parameter.name}'")
 
     if len(arguments) < required_positionals:
