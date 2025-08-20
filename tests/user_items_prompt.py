@@ -1,6 +1,6 @@
 from typing import Optional
 from npycli import CLI, Command, EmptyEntriesError, CommandDoesNotExistError
-from npycli.kwarg_alasing import alias_cmd_kwargs
+from npycli.kwarg_aliasing import alias_cmd_kwargs
 
 cli = CLI(title='user-items', prompt_marker='->', env={'user-items': {}})
 

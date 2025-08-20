@@ -1,4 +1,4 @@
-from types import FrameType
+from types import FrameType, NoneType
 from typing import Optional, Any, IO
 from os.path import isfile
 from math import ceil
@@ -6,7 +6,9 @@ import json
 from npycli import CLI, Command, CLIError, EmptyEntriesError
 from npycli.command import cmd
 from npycli.errors import CommandDoesNotExistError
-from npycli.kwarg_alasing import alias_cmd_kwargs
+from npycli.kwarg_aliasing import alias_cmd_kwargs
+from npycli.parameters import CommandParameter, ParameterKind
+
 
 USER_ITEMS_FILE = 'user-items.gitignore.json'
 TAB_WIDTH: int = 4

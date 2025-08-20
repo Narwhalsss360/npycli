@@ -5,7 +5,6 @@ from inspect import signature, Signature, Parameter, getdoc, get_annotations
 
 from .parameters import CommandParameter, parse_parameters
 from .errors import ParsingError, CommandArgumentError
-from .parsing import type_from_annotation
 
 
 @dataclass
