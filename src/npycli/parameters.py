@@ -166,6 +166,10 @@ class CommandParameter:
     def custom_attributes(self) -> dict[str, Any]:
         return self._custom_attributes
 
+    @property
+    def argument_type(self) -> type:
+        return self.argument_types[0]
+
     def add_custom_attribute(self, key: str, value: Any, overwrite: bool = False) -> None:
         if not overwrite and key in self._custom_attributes:
             raise KeyError(f"Key {key} already exists and overwrite is False")
