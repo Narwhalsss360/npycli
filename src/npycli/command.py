@@ -85,6 +85,9 @@ class Command:
             self._details += '\t'
         self._details += detail
 
+    def find_parameter(self, parameter_name: str) -> CommandParameter | None:
+        return next(filter(lambda p: parameter_name in p.names, self._parameters), None)
+
     def exec_with(self, entries: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
         """
         Execute this `Command` with specified arguments and parsers
