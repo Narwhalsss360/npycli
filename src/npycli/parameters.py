@@ -3,6 +3,7 @@ from types import UnionType
 from typing import Callable, Any, Annotated, Type, Union, get_origin, get_args, cast
 from inspect import _ParameterKind, Parameter
 from dataclasses import dataclass, field
+from .errors import ParsingError
 
 
 ParameterKind = _ParameterKind
@@ -239,7 +240,7 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type
                 continue
 
             if isinstance(
-                handled := err(entry, NotImplementedError(f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
+                handled := err(entry, ParsingError(f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
                 Exception
             ):
                 raise handled
@@ -288,17 +289,17 @@ def parse_parameters(
 
         if not no_keywords and entry.startswith(keyword_prefix):
             if keyword_parameter is not None:
-                raise NotImplementedError(f"'{keyword_parameter.name}' is missing a value")
+                raise ParsingError(f"'{keyword_parameter.name}' is missing a value")
             if var_kwarg is not None:
-                raise NotImplementedError(f"'{var_kwarg}' is missing a value")
+                raise ParsingError(f"'{var_kwarg}' is missing a value")
 
             keyword = entry[len(keyword_prefix):]
             if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None:
                 if keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
-                    raise NotImplementedError("This argument is positional only")
+                    raise ParsingError("This argument is positional only")
                 elif keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
                     if parameters.index(keyword_parameter) < len(arguments):
-                        raise NotImplementedError(f"'{keyword_parameter.name}' was already specified positionally")
+                        raise ParsingError(f"'{keyword_parameter.name}' was already specified positionally")
 
                 if keyword_parameter.argument_types[0] == bool: # Boolean flag
                     keyword_arguments[keyword_parameter.name] = True
@@ -307,7 +308,7 @@ def parse_parameters(
                 if var_kwargs is not None:
                     var_kwarg = keyword
                 else:
-                    raise NotImplementedError(f"'{keyword}' is not a keyword parameter")
+                    raise ParsingError(f"'{keyword}' is not a keyword parameter")
             continue
 
         if keyword_parameter is not None:
@@ -334,18 +335,18 @@ def parse_parameters(
             continue
 
         if len(arguments) >= len(parameters):
-            raise NotImplementedError(f"Too many positional arguments")
+            raise ParsingError(f"Too many positional arguments")
 
         parameter: CommandParameter = parameters[len(arguments)]
         if parameter.kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
-            raise NotImplementedError(f"Too many positional arguments")
+            raise ParsingError(f"Too many positional arguments")
         arguments.append(parse_with_hooks(parameter, entry, parsers))
 
     required_positionals: int = 0
     for i, parameter in enumerate(parameters):
         if parameter.kind == ParameterKind.POSITIONAL_ONLY:
             if parameter.default == parameter.empty and len(arguments) <= i:
-                raise NotImplementedError(f"Missing required positional '{parameter.name}'")
+                raise ParsingError(f"Missing required positional '{parameter.name}'")
             continue
 
         if parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
@@ -354,15 +355,15 @@ def parse_parameters(
             if len(arguments) > i:
                 continue
             if parameter.private_name not in keyword_arguments:
-                raise NotImplementedError(f"Missing required keyword/positional '{parameter.name}'")
+                raise ParsingError(f"Missing required keyword/positional '{parameter.name}'")
         if parameter.default != parameter.empty or parameter.kind in (ParameterKind.VAR_POSITIONAL, ParameterKind.VAR_KEYWORD):
             continue
 
         if parameter.private_name not in keyword_arguments:
-            raise NotImplementedError(f"Missing required keyword '{parameter.name}'")
+            raise ParsingError(f"Missing required keyword '{parameter.name}'")
 
     if len(arguments) < required_positionals:
-        raise NotImplementedError(f"Missing required positional '{parameters[len(arguments)].name}'")
+        raise ParsingError(f"Missing required positional '{parameters[len(arguments)].name}'")
 
     return arguments, keyword_arguments
 
