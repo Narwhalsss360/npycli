@@ -165,14 +165,14 @@ def help_cmd(
         if parameter.parse_hooks is not None:
             out += f"\n{tabstr}Parse Hooks:"
             if parameter.parse_hooks.pre is not None:
-                out += f"{tabstr}{" " * TAB_WIDTH}Pre-Hook: {getattr(parameter.parse_hooks.pre, "__name__", "...")}"
+                out += f"\n{tabstr}{" " * TAB_WIDTH}Pre-Hook: {getattr(parameter.parse_hooks.pre, "__name__", "...")}"
             if parameter.parse_hooks.post is not None:
-                out += f"{tabstr}{" " * TAB_WIDTH}Post-Hook: {getattr(parameter.parse_hooks.post, "__name__", "...")}"
+                out += f"\n{tabstr}{" " * TAB_WIDTH}Post-Hook: {getattr(parameter.parse_hooks.post, "__name__", "...")}"
             if parameter.parse_hooks.err is not None:
-                out += f"{tabstr}{" " * TAB_WIDTH}Error-Hook: {getattr(parameter.parse_hooks.err, "__name__", "...")}"
+                out += f"\n{tabstr}{" " * TAB_WIDTH}Error-Hook: {getattr(parameter.parse_hooks.err, "__name__", "...")}"
 
         if parameter.description:
-            out += f"{tabstr}Description: {parameter.description.replace("\n", f"\n{tabstr}")}"
+            out += f"\n{tabstr}Description: {parameter.description.replace("\n", f"\n{tabstr}")}"
 
         return out
 
@@ -206,6 +206,9 @@ def help_cmd(
             out += extended_parameter_help(parameter)
             if i != len(command.parameters) - 1:
                 out += "\n"
+
+        if command.help:
+            out += f"\nDesciption: {command.help}"
 
         return out
 
