@@ -57,8 +57,8 @@ class DefaultPreview:
 class ParseHooks:
     def __init__(
         self,
-        pre: Callable[[str], str] | None,
-        post: Callable[[Any], Any] | None,
+        pre: Callable[[str], str] | None = None,
+        post: Callable[[Any], Any] | None = None,
         err: Callable[[str, Exception], Any | Exception] | None = None
     ) -> None:
         self.pre: Callable[[str], str] | None = pre
