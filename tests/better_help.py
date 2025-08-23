@@ -2,7 +2,7 @@ from types import NoneType
 from typing import Annotated, Optional
 from npycli import CLI, Command, EmptyEntriesError, CommandDoesNotExistError
 from npycli.kwarg_aliasing import alias_cmd_kwargs
-from npycli.parameters import Alias, CommandParameter, Description
+from npycli.parameters import CommandParameter, Description
 
 
 TAB_CHARS: str = " " * 4

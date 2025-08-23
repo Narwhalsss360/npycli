@@ -5,7 +5,6 @@ from math import ceil
 import json
 from npycli import CLI, Command, CLIError, EmptyEntriesError
 from npycli.command import cmd
-from npycli.errors import CommandDoesNotExistError
 from npycli.kwarg_aliasing import alias_cmd_kwargs
 from npycli.parameters import CommandParameter, ParameterKind
 

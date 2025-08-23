@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import UnionType
-from typing import Callable, Any, Annotated, Type, Union, get_origin, get_args, cast
+from typing import Callable, Any, Annotated, Type, Union, get_origin, get_args
 from inspect import _ParameterKind, Parameter
 from dataclasses import dataclass, field
 from .errors import ParsingError
@@ -366,31 +366,3 @@ def parse_parameters(
         raise ParsingError(f"Missing required positional '{parameters[len(arguments)].name}'")
 
     return arguments, keyword_arguments
-
-
-def main() -> None:
-    from pathlib import Path
-    two_sum_parameters: list[CommandParameter] = [
-        CommandParameter.build(
-            "first",
-            ParameterKind.POSITIONAL_ONLY,
-            Annotated[int | float, Alias("a", "x"), Description("First number to sum.")]
-        ),
-        CommandParameter.build(
-            "second",
-            ParameterKind.POSITIONAL_OR_KEYWORD,
-            Annotated[int | float, Alias("b", "y"), Description("Second number to sum.")]
-        ),
-        CommandParameter.build(
-            "output",
-            ParameterKind.KEYWORD_ONLY,
-            Annotated[Path, CustomAttrbute("directory", "no")],
-            default=None
-        )
-    ]
-    parsed = parse_parameters(two_sum_parameters, ["1.2", "2"], "--", "--", {})
-    del parsed
-
-
-if __name__ == "__main__":
-    main()
