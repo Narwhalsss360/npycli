@@ -3,7 +3,7 @@ from typing import Callable, Optional, Any
 from dataclasses import dataclass, field
 from inspect import signature, Signature, Parameter, getdoc, get_annotations
 
-from .parameters import CommandParameter, parse_parameters
+from .parameters import CommandParameter, ParameterKind, parse_parameters
 from .errors import ParsingError, CommandArgumentError
 
 
@@ -68,7 +68,7 @@ class Command:
         :return: Details
         """
 
-        return self._details
+        return self.basic_command_help()
 
     @property
     def parameters(self) -> list[CommandParameter]:
@@ -81,9 +81,7 @@ class Command:
         :return: `None`
         """
 
-        if not self._details[-1] == '\t':
-            self._details += '\t'
-        self._details += detail
+        self._details.append(detail)
 
     def find_parameter(self, parameter_name: str) -> CommandParameter | None:
         return next(filter(lambda p: parameter_name in p.names, self._parameters), None)
@@ -170,44 +168,9 @@ class Command:
             self._keyword_types[parameter.name] = parameter_type
 
     def _generate_details(self) -> None:
-        self._details: str = ''
-        last = len(self.names) - 1
-        for index, name in enumerate(self.names):
-            self._details += name
-            if index != last:
-                self._details += ' '
-
-        parameters = self._parameters
-
-        if len(parameters) == 0:
-            return
-
-        self._details += '\t'
-        last = len(parameters) - 1
-        for index, parameter in enumerate(self._parameters):
-            arg_type = parameter.argument_types[0]
-            if parameter.kind == Parameter.VAR_POSITIONAL:
-                self._details += '<*'
-            elif parameter.kind == Parameter.VAR_KEYWORD:
-                self._details += '<**'
-            else:
-                self._details += '<'
-            self._details += parameter.name
-
-            if parameter.default != parameter.empty:
-                self._details += '?'
-            if arg_type == str:
-                self._details += '>'
-            else:
-                self._details += f': {arg_type.__name__}>'
-
-            if index != last:
-                self._details += ' '
-
-        if self.help is None or self.help.strip() == '':
-            self.help = getdoc(self.function)
-        else:
-            self._details += f'\t{self.help}'
+        self._details: list[str] = []
+        if self.help is None and (doc := getdoc(self.function)) is not None:
+            self.help = doc
 
     def _callback_futures(self) -> None:
         if not hasattr(self.function, Command.__FUTURE_CMD_ATTR__):
@@ -224,6 +187,45 @@ class Command:
 
     def _is_argument_error(self, type_error: TypeError) -> bool:
         return type_error.args[0].startswith(f'{self.function.__name__}(')
+
+    def basic_command_help(self) -> str:
+        out: str = f"{self.name} "
+        last_positional_only_index: int = -1
+        for i, parameter in enumerate(self.parameters):
+            if parameter.kind == ParameterKind.POSITIONAL_ONLY:
+                last_positional_only_index = i
+            else:
+                break
+
+        for i, parameter in enumerate(self.parameters):
+            out += parameter.basic_parameter_help()
+            if i == last_positional_only_index:
+                out += " /"
+            if i != len(self.parameters) - 1:
+                out += " "
+        return out
+
+    def extended_command_help(self) -> str:
+        out: str = ""
+        for i, name in enumerate(self.names):
+            out += name
+            if i != len(self.names) - 1:
+                out += " "
+        out += "\n"
+
+        out += "Parameters:\n"
+        for i, parameter in enumerate(self.parameters):
+            out += parameter.extended_parameter_help()
+            if i != len(self.parameters) - 1:
+                out += "\n"
+
+        if self.help:
+            out += f"\nDesciption: {self.help}"
+
+        for detail in self._details:
+            out += f"\n->{detail}"
+
+        return out
 
     def __call__(self, args: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
         return self.exec_with(args, parsers)

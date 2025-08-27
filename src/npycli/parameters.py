@@ -1,5 +1,5 @@
 from __future__ import annotations
-from types import UnionType
+from types import NoneType, UnionType
 from typing import Callable, Any, Annotated, Type, Union, get_origin, get_args
 from inspect import _ParameterKind, Parameter
 from dataclasses import dataclass, field
@@ -202,6 +202,83 @@ class CommandParameter:
         if not overwrite and key in self._custom_attributes:
             raise KeyError(f"Key {key} already exists and overwrite is False")
         self._custom_attributes[key] = value
+
+    @staticmethod
+    def type_name(t: type) -> str:
+        if t == NoneType:
+            return str(None)
+        return t.__name__
+
+    def annotation_preview_fallback(self) -> str:
+        if self.annotation_preview:
+            return self.annotation_preview
+        out: str = ""
+        for i, t in enumerate(self.argument_types):
+            out += CommandParameter.type_name(t)
+            if i != len(self.argument_types) - 1:
+                out += " | "
+        return out
+
+    def default_preview_fallback(self) -> str | None:
+        if self.default == self.empty:
+            return None
+        if self.default_preview:
+            return self.default_preview
+        return repr(self.default)
+
+    def basic_parameter_help(self) -> str:
+        if (
+            self.default != self.empty and
+            self.argument_types[0] == bool and
+            self.kind in (ParameterKind.POSITIONAL_OR_KEYWORD, ParameterKind.KEYWORD_ONLY)
+        ):
+            return f"[{self.name}]"
+        else:
+            return (
+                "<"
+                f"{"*" if self.kind == ParameterKind.VAR_POSITIONAL else ""}"
+                f"{"**" if self.kind == ParameterKind.VAR_KEYWORD else ""}"
+                f"{self.name}: "
+                f"{self.annotation_preview_fallback()}"
+                f"{"" if (default := self.default_preview_fallback()) is None else f" = {default}"}"
+                ">"
+            )
+
+    def extended_parameter_help(self, tab_chars: str = " " * 4) -> str:
+        tabstr: str = tab_chars
+        out = tabstr
+        for i, name in enumerate(self.names):
+            out += name
+            if i != len(self.names) - 1:
+                out += " "
+        out += "\n"
+
+        tabstr = tab_chars * 2
+        out += f"{tabstr}Kind: {self.kind.name}\n"
+        out += f"{tabstr}Annotation: {self.annotation_preview_fallback()}\n"
+
+        out += f"{tabstr}Types:\n"
+        for i, t in enumerate(self.argument_types):
+            out += f"{tabstr}{tab_chars}{CommandParameter.type_name(t)}"
+            if i != len(self.argument_types) - 1:
+                out += "\n"
+
+        if (default := self.default_preview_fallback()) is not None:
+            out += f"\n{tabstr}Default: {default}"
+
+        if self.parse_hooks is not None:
+            out += f"\n{tabstr}Parse Hooks:"
+            if self.parse_hooks.pre is not None:
+                out += f"\n{tabstr}{tab_chars}Pre-Hook: {getattr(self.parse_hooks.pre, "__name__", "...")}"
+            if self.parse_hooks.post is not None:
+                out += f"\n{tabstr}{tab_chars}Post-Hook: {getattr(self.parse_hooks.post, "__name__", "...")}"
+            if self.parse_hooks.err is not None:
+                out += f"\n{tabstr}{tab_chars}Error-Hook: {getattr(self.parse_hooks.err, "__name__", "...")}"
+
+        if self.description:
+            out += f"\n{tabstr}Description: {self.description.replace("\n", f"\n{tabstr}")}"
+
+        return out
 
     def remove_custom_attribute(self, key: str) -> Any:
         return self._custom_attributes.pop(key)
