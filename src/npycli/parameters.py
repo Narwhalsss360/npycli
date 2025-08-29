@@ -101,7 +101,7 @@ class CommandParameter:
     annotation: Any
     annotation_preview: str = field(default=DEFAULT_STR)
     argument_types: tuple[type, ...] = field(default=DEFAULT_ARG_TYPES)
-    default: Any = field(default=empty)
+    default: Any = field(default_factory=lambda: CommandParameter.empty)
     default_preview: str = field(default=DEFAULT_STR)
     description: str = field(default=DEFAULT_STR)
     parse_hooks: ParseHooks | None = field(default=None)
@@ -236,11 +236,11 @@ class CommandParameter:
         else:
             return (
                 "<"
-                f"{"*" if self.kind == ParameterKind.VAR_POSITIONAL else ""}"
-                f"{"**" if self.kind == ParameterKind.VAR_KEYWORD else ""}"
+                f"{'*' if self.kind == ParameterKind.VAR_POSITIONAL else ''}"
+                f"{'**' if self.kind == ParameterKind.VAR_KEYWORD else ''}"
                 f"{self.name}: "
                 f"{self.annotation_preview_fallback()}"
-                f"{"" if (default := self.default_preview_fallback()) is None else f" = {default}"}"
+                f"{'' if (default := self.default_preview_fallback()) is None else f' = {default}'}"
                 ">"
             )
 
@@ -269,14 +269,14 @@ class CommandParameter:
         if self.parse_hooks is not None:
             out += f"\n{tabstr}Parse Hooks:"
             if self.parse_hooks.pre is not None:
-                out += f"\n{tabstr}{tab_chars}Pre-Hook: {getattr(self.parse_hooks.pre, "__name__", "...")}"
+                out += f"\n{tabstr}{tab_chars}Pre-Hook: {getattr(self.parse_hooks.pre, '__name__', '...')}"
             if self.parse_hooks.post is not None:
-                out += f"\n{tabstr}{tab_chars}Post-Hook: {getattr(self.parse_hooks.post, "__name__", "...")}"
+                out += f"\n{tabstr}{tab_chars}Post-Hook: {getattr(self.parse_hooks.post, '__name__', '...')}"
             if self.parse_hooks.err is not None:
-                out += f"\n{tabstr}{tab_chars}Error-Hook: {getattr(self.parse_hooks.err, "__name__", "...")}"
+                out += f"\n{tabstr}{tab_chars}Error-Hook: {getattr(self.parse_hooks.err, '__name__', '...')}"
 
         if self.description:
-            out += f"\n{tabstr}Description: {self.description.replace("\n", f"\n{tabstr}")}"
+            out += f"\n{tabstr}Description: {self.description.replace(chr(0x0A), f'{chr(0x0A)}{tabstr}')}"
 
         return out
 
