@@ -5,7 +5,7 @@ from npycli.ansi import (
     CURSOR_DOWN,
     CURSOR_UP,
     INSERT_NEW_LINE,
-    RESTORE_SAVED_CURRENT_CURSOR_POSITION,
+    RESTORE_SAVED_CURSOR_POSITION,
     SELECT_CHARACTER_RENDITION,
     FOREGROND_RED,
     BACKGROND_WHITE,
@@ -41,7 +41,7 @@ def print_above(*args, **kwargs) -> None:
 
     # Flush, just in case current cursor position gets moved after output
     print(output, end='', flush=True)
-    send_ansi(RESTORE_SAVED_CURRENT_CURSOR_POSITION)
+    send_ansi(RESTORE_SAVED_CURSOR_POSITION)
     send_ansi(CURSOR_DOWN.with_args(line_count))
 
 
