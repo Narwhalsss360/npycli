@@ -142,7 +142,19 @@ class CommandParameter:
                     parameter.argument_types = (origin,)
                     parameter._container_annotation = annotation
                 elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
-                    parameter.argument_types = tuple(arg for arg in get_args(annotation) if isinstance(arg, type))
+                    args = get_args(annotation)
+                    argument_types: list[type] = []
+                    for arg in args:
+                        if not isinstance(arg, type):
+                            continue
+                        if arg is str:
+                            # This is will always successfully parse, therefore no other types are necessary except possibly NoneType
+                            argument_types.append(str)
+                            if NoneType in args and NoneType not in argument_types:
+                                argument_types.append(NoneType)
+                            break
+                        argument_types.append(arg)
+                    parameter.argument_types = tuple(argument_types)
                 else:
                     raise TypeError(f"{annotation} is unsupported")
 
