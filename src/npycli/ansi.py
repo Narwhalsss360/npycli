@@ -15,13 +15,13 @@ class ANSIControl:
     @staticmethod
     def send(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
         if isinstance(ansi_control, ANSIControl):
-            for _ in range(repeat):
-                print(str(ansi_control), end='', flush=True)
+            for i in range(repeat):
+                print(str(ansi_control), end='', flush=i == repeat - 1)
         else:
             if not ansi_control.startswith(ANSIControl.CSI):
                 raise ValueError(f'Sequence {ansi_control} does not start with ANSI CSI')
-            for _ in range(repeat):
-                print(ansi_control, end='', flush=True)
+            for i in range(repeat):
+                print(ansi_control, end='', flush=i == repeat - 1)
 
     def __post_init__(self) -> None:
         self._with_no_args: Optional[ANSIControl] = None
