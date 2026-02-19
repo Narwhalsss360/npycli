@@ -12,12 +12,13 @@ Multiple command programs should use the `CLI` type as it manages multiple comma
 
 To handle return values of `Command` functions, write a *callback* function that will be used by `cli`. The callback
 function will take as arguments the `Command` and the return value.
+This function may be used to _mutate_ the return value for the caller of `CLI.exec`.
 
 This return value handler will simply print the command name, and print the return value if not None.
 
 ```python
 @cli.retvals()
-def retvals(command: Command, return_value: Optional[Any]) -> None:
+def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
     if return_value is None:
         return
     print(f'{command.name} -> {return_value}')
@@ -27,6 +28,7 @@ def retvals(command: Command, return_value: Optional[Any]) -> None:
 
 To handle raised exceptions, write a *callback* function that will take as arguments the `Command` the exception was
 raised in, and the `Exception` itself.
+This function may be used to provide a return value for the caller of `CLI.exec`, otherwise errors `return None`
 
 This exception handler will simply print the exception, then exit.
 

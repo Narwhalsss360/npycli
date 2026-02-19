@@ -130,14 +130,14 @@ def help_cmd(
 
 
 @cli.retvals()
-def retvals(command: Command, return_value: Optional[Any]) -> None:
+def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
     if return_value is None:
         return
     print(f'{command.name}:\n{return_value}')
 
 
 @cli.errors()
-def errors(command: Command, exc: Exception) -> None:
+def errors(command: Command, exc: Exception) -> Optional[Any]:
     print(f'{command.name} error: {exc}')
 
 

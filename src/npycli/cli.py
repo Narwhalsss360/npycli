@@ -14,8 +14,8 @@ class CLI:
         self.kwarg_prefix: str = kwarg_prefix or '--'
         self.parsers: dict[type, Callable[[str], Any]] = parsers or {}
         self.env: dict = env or {}
-        self._retval_handler: Optional[Callable[[Command, Any], None]] = retval_handler
-        self._error_handler: Optional[Callable[[Command, Exception], None]] = error_handler
+        self._retval_handler: Optional[Callable[[Command, Any], Optional[Any]]] = retval_handler
+        self._error_handler: Optional[Callable[[Command, Exception], Optional[Any]]] = error_handler
         self._commands: list[Command] = []
 
     @property
@@ -118,17 +118,15 @@ class CLI:
             if self._error_handler is None:
                 cli_error.cli = self
                 raise cli_error
-            self._error_handler(command, cli_error)
-            return None
+            return self._error_handler(command, cli_error)
         except Exception as error:
             if self._error_handler is None:
                 raise CLIError(f'An exception was raised running {command.name}: {error}', cli=self,
                                command=command) from error
-            self._error_handler(command, error)
-            return None
+            return self._error_handler(command, error)
 
         if self._retval_handler is not None:
-            self._retval_handler(command, retval)
+            return self._retval_handler(command, retval)
         return retval
 
     def prompt(self) -> Optional[Any]:
