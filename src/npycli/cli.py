@@ -7,8 +7,8 @@ from .errors import EmptyEntriesError, CommandDoesNotExistError, CLIError
 class CLI:
     def __init__(self, title: Optional[str] = None, prompt_marker: Optional[str] = None,
                  kwarg_prefix: Optional[str] = None, parsers: Optional[dict[type, Callable[[str], Any]]] = None,
-                 env: Optional[dict] = None, retval_handler: Optional[Callable[[Command, Any], None]] = None,
-                 error_handler: Optional[Callable[[Command, Exception], None]] = None) -> None:
+                 env: Optional[dict] = None, retval_handler: Optional[Callable[[Command, Any], Optional[Any]]] = None,
+                 error_handler: Optional[Callable[[Command, Exception], Optional[Any]]] = None) -> None:
         self.title: str = title or 'CLI'
         self.prompt_marker: str = prompt_marker or '>'
         self.kwarg_prefix: str = kwarg_prefix or '--'
