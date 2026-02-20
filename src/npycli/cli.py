@@ -107,10 +107,10 @@ class CLI:
         """
 
         if not entries:
-            raise EmptyEntriesError('Nothing was entered.')
+            raise EmptyEntriesError('Nothing was entered.', cli=self)
         name: str = entries.pop(0)
         if (command := self.get_command(name)) is None:
-            raise CommandDoesNotExistError(f'Command {name} does not exist.')
+            raise CommandDoesNotExistError(f'Command {name} does not exist.', cli=self)
 
         try:
             retval: Any = command(entries, self.parsers)
