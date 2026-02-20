@@ -27,7 +27,7 @@ Commands generate `details`. Add your own by using bound function `Command.add_d
 See *primary* name of a command by accessing property `Command.name`.  
 See aliases of a command by accessing property `Command.aliases`.
 
-If you want to modify the command of a specific function *almost* like a decorator for commands, use the `future_cmd`
+If you want to modify the command of a specific function *almost* like a decorator for commands, use the `cmd_hook`
 function. Pass in a `function` that will later be a `Command`, then pass in a `callback` function, that will be called
 back to modify a `Command` after it has been created.
 

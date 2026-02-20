@@ -1,6 +1,6 @@
 from typing import Callable, Any
 from functools import wraps
-from .command import Command, future_cmd
+from .command import Command, cmd_hook
 
 ALIASES_ATTR = '__kwarg_aliases__'
 
@@ -48,7 +48,7 @@ def alias_cmd_kwargs(aliases: dict[str, tuple[str, ...]]) -> Callable[[Callable]
                 assert parameter is not None, f"{kwarg} is not a parameter, cannot alias."
                 parameter.names = parameter.names + kwarg_aliases
 
-        future_cmd(func, add_detail)
+        cmd_hook(func, add_detail)
         attach_kwarg_aliases(func, aliases)
 
         @wraps(func)

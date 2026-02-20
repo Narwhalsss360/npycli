@@ -10,7 +10,7 @@ from .errors import ParsingError, CommandArgumentError
 @dataclass
 class Command:
     __CMD_ATTR__ = '__cmd__'
-    __FUTURE_CMD_ATTR__ = '__future_cmd__'
+    __CMD_HOOKS_ATTR__ = '__cmd_hooks__'
 
     function: Callable
     names: tuple[str, ...]
@@ -173,9 +173,9 @@ class Command:
             self.help = doc
 
     def _callback_futures(self) -> None:
-        if not hasattr(self.function, Command.__FUTURE_CMD_ATTR__):
+        if not hasattr(self.function, Command.__CMD_HOOKS_ATTR__):
             return
-        for callback in getattr(self.function, Command.__FUTURE_CMD_ATTR__):
+        for callback in getattr(self.function, Command.__CMD_HOOKS_ATTR__):
             callback(self)
 
     def __post_init__(self) -> None:
@@ -244,10 +244,10 @@ def cmd(function: Callable) -> Command:
     raise ValueError(f"{function} is not a command. Use {is_cmd}.")
 
 
-def future_cmd(function: Callable, callback: Callable[[Command], None]) -> None:
+def cmd_hook(function: Callable, callback: Callable[[Command], None]) -> None:
     if is_cmd(function):
         raise \
             TypeError(f'function {function} is already not a future command, it is already a command: {cmd(function)}')
-    if not hasattr(function, Command.__FUTURE_CMD_ATTR__):
-        setattr(function, Command.__FUTURE_CMD_ATTR__, [])
-    getattr(function, Command.__FUTURE_CMD_ATTR__).append(callback)
+    if not hasattr(function, Command.__CMD_HOOKS_ATTR__):
+        setattr(function, Command.__CMD_HOOKS_ATTR__, [])
+    getattr(function, Command.__CMD_HOOKS_ATTR__).append(callback)
