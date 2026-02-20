@@ -1,5 +1,6 @@
 import builtins
-from typing import Optional, Any, Callable, get_args
+from collections.abc import Callable
+from typing import Optional, Any, get_args
 from itertools import zip_longest
 from .errors import MissingKeywordArgumentValueError, ParsingError, TooManyArgumentsError
 

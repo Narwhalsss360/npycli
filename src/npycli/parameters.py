@@ -1,6 +1,7 @@
 from __future__ import annotations
 from types import NoneType, UnionType
-from typing import Callable, Any, Annotated, Type, Union, get_origin, get_args
+from collections.abc import Callable
+from typing import Any, Annotated, Type, Union, get_origin, get_args
 from inspect import _ParameterKind, Parameter
 from dataclasses import dataclass, field
 from .errors import ParsingError

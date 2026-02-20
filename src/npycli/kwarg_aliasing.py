@@ -1,4 +1,5 @@
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
 from functools import wraps
 from .command import Command, cmd_hook
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Callable, Optional, Any
+from collections.abc import Callable
+from typing import Optional, Any
 from dataclasses import dataclass, field
 from inspect import signature, Signature, Parameter, getdoc, get_annotations
 

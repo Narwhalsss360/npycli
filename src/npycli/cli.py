@@ -1,4 +1,5 @@
-from typing import Optional, Callable, Any
+from collections.abc import Callable
+from typing import Optional, Any
 from shlex import split
 from .command import Command
 from .errors import EmptyEntriesError, CommandDoesNotExistError, CLIError
@@ -69,7 +70,8 @@ class CLI:
 
         def decorator(function: Callable) -> Callable:
             self.add_command(
-                Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix))
+                Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix)
+            )
             return function
 
         return decorator
