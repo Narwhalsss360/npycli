@@ -1,8 +1,8 @@
 from __future__ import annotations
 from collections.abc import Callable
-from typing import Optional, Any
+from typing import Optional, Any, get_type_hints
 from dataclasses import dataclass, field
-from inspect import signature, Signature, Parameter, getdoc, get_annotations
+from inspect import signature, Signature, Parameter, getdoc
 
 from .parameters import CommandParameter, ParameterKind, parse_parameters
 from .errors import ParsingError, CommandArgumentError
@@ -139,7 +139,7 @@ class Command:
         self._var_args_parser: Optional[type] = None
         self._parameters: list[CommandParameter] = []
 
-        annotations: dict[str, Any] = get_annotations(self.function)
+        annotations: dict[str, Any] = get_type_hints(self.function, include_extras=True)
 
         for index, parameter in enumerate(self._signature.parameters.values()):
             self._parameters.append(
