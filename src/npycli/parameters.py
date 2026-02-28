@@ -116,7 +116,7 @@ class CommandParameter:
     @staticmethod
     def build(name: str, kind: ParameterKind, annotation: Any, default: Any = empty) -> CommandParameter:
         if isinstance(annotation, str):
-            raise ValueError("'annotation' must not be the source code annotation strign.")
+            raise ValueError("'annotation' must not be the source code annotation string.")
         DEFAULT_NAMES: tuple[str] = ("",)
         parameter: CommandParameter = CommandParameter(DEFAULT_NAMES, kind, annotation, default=default)
 
