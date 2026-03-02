@@ -1,19 +1,20 @@
 from collections.abc import Callable
 from typing import Optional, Any
 from shlex import split
+from .parameters import CommandParameterType
 from .command import Command
 from .errors import EmptyEntriesError, CommandDoesNotExistError, CLIError
 
 
 class CLI:
     def __init__(self, title: Optional[str] = None, prompt_marker: Optional[str] = None,
-                 kwarg_prefix: Optional[str] = None, parsers: Optional[dict[type, Callable[[str], Any]]] = None,
+                 kwarg_prefix: Optional[str] = None, parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None,
                  env: Optional[dict[Any, Any]] = None, retval_handler: Optional[Callable[[Command, Any], Any]] = None,
                  error_handler: Optional[Callable[[Command, Exception], Any]] = None) -> None:
         self.title: str = title or 'CLI'
         self.prompt_marker: str = prompt_marker or '>'
         self.kwarg_prefix: str = kwarg_prefix or '--'
-        self.parsers: dict[type, Callable[[str], Any]] = parsers or {}
+        self.parsers: dict[CommandParameterType, Callable[[str], Any]] = parsers or {}
         self.env: dict[Any, Any] = env or {}
         self._retval_handler: Optional[Callable[[Command, Any], Any]] = retval_handler
         self._error_handler: Optional[Callable[[Command, Exception], Any]] = error_handler

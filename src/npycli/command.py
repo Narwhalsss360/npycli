@@ -4,7 +4,7 @@ from typing import Optional, Any, get_type_hints
 from dataclasses import dataclass, field
 from inspect import signature, Signature, Parameter, getdoc
 
-from .parameters import CommandParameter, ParameterKind, parse_parameters
+from .parameters import CommandParameter, ParameterKind, CommandParameterType, parse_parameters
 from .errors import ParsingError, CommandArgumentError
 
 
@@ -87,7 +87,7 @@ class Command:
     def find_parameter(self, parameter_name: str) -> CommandParameter | None:
         return next(filter(lambda p: parameter_name in p.names, self._parameters), None)
 
-    def exec_with(self, entries: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
+    def exec_with(self, entries: list[str], parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None) -> Any:
         """
         Execute this `Command` with specified arguments and parsers
         :param args: Arguments
@@ -131,12 +131,12 @@ class Command:
         self._signature: Signature = signature(self.function)
         self._required_parameters: list[Parameter] = []
         self._optional_parameters: list[Parameter] = []
-        self._positional_types: list[type] = []
-        self._keyword_types: dict[str, type] = {}
+        self._positional_types: list[CommandParameterType] = []
+        self._keyword_types: dict[str, CommandParameterType] = {}
         self._has_var_args: bool = False
         self._var_args_index: Optional[int] = None
         self._has_var_kwargs: bool = False
-        self._var_args_parser: Optional[type] = None
+        self._var_args_parser: Optional[CommandParameterType] = None
         self._parameters: list[CommandParameter] = []
 
         annotations: dict[str, Any] = get_type_hints(self.function, include_extras=True)
@@ -164,7 +164,7 @@ class Command:
                 self._has_var_kwargs = True
                 continue
 
-            parameter_type: type = self._parameters[-1].argument_types[0]
+            parameter_type: CommandParameterType = self._parameters[-1].argument_types[0]
             self._positional_types.append(parameter_type)
             self._keyword_types[parameter.name] = parameter_type
 
@@ -228,7 +228,7 @@ class Command:
 
         return out
 
-    def __call__(self, args: list[str], parsers: Optional[dict[type, Callable[[str], Any]]] = None) -> Any:
+    def __call__(self, args: list[str], parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None) -> Any:
         return self.exec_with(args, parsers)
 
     def __str__(self) -> str:

@@ -1,7 +1,8 @@
 import builtins
 from collections.abc import Callable
-from typing import Optional, Any, get_args
+from typing import Optional, Any, get_args, Type
 from itertools import zip_longest
+from enum import Enum
 from .errors import MissingKeywordArgumentValueError, ParsingError, TooManyArgumentsError
 
 
@@ -91,3 +92,13 @@ def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_t
             raise ParsingError(f"An error ({repr(exc)}) occurred parsing '{arg}' as {arg_type}.") from exc
 
     return args, kwargs
+
+
+def create_enum_parser[T](enum_type: Type[T]) -> Callable[[str], T]:
+    assert issubclass(enum_type, Enum)
+    def parser(s: str) -> T:
+        try:
+            return enum_type(s)
+        except ValueError:
+            return enum_type[s]
+    return parser

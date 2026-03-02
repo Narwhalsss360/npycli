@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import NoneType, UnionType
 from collections.abc import Callable
-from typing import Any, Annotated, Type, Union, get_origin, get_args
+from typing import Any, Annotated, Type, Union, TypeAliasType, get_origin, get_args
 from inspect import _ParameterKind, Parameter # type: ignore
 from dataclasses import dataclass, field
 from .errors import ParsingError
@@ -90,6 +90,9 @@ ContainerTypes = (list[Any] | tuple[Any, ...])
 CONTAINER_TYPES: tuple[type, ...] = list, tuple
 
 
+type CommandParameterType = type | TypeAliasType
+
+
 @dataclass
 class CommandParameter:
     UNPARSED = object()
@@ -101,7 +104,7 @@ class CommandParameter:
     kind: ParameterKind
     annotation: Any
     annotation_preview: str = field(default=DEFAULT_STR)
-    argument_types: tuple[type, ...] = field(default=DEFAULT_ARG_TYPES)
+    argument_types: tuple[CommandParameterType, ...] = field(default=DEFAULT_ARG_TYPES)
     default: Any = field(default_factory=lambda: CommandParameter.empty)
     default_preview: str = field(default=DEFAULT_STR)
     description: str = field(default=DEFAULT_STR)
@@ -120,7 +123,7 @@ class CommandParameter:
         DEFAULT_NAMES: tuple[str] = ("",)
         parameter: CommandParameter = CommandParameter(DEFAULT_NAMES, kind, annotation, default=default)
 
-        def next_annotation(annotation: Any, is_metadata: bool = False) -> None:
+        def next_annotation(annotation: Any, is_metadata: bool = False, appending: bool = False) -> None:
             if is_metadata:
                 if isinstance(annotation, Alias):
                     parameter.names = (() if annotation.private else (name,)) + annotation.aliases
@@ -137,25 +140,26 @@ class CommandParameter:
                     parameter.add_custom_attribute(annotation.key, annotation.value, annotation.overwrite)
             else:
                 if isinstance(annotation, type):
-                    parameter.argument_types = (annotation,)
+                    if not appending or parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+                        parameter.argument_types = (annotation,)
+                    else:
+                        parameter.argument_types = parameter.argument_types + (annotation,)
+                elif isinstance(annotation, TypeAliasType):
+                    if parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+                        parameter.argument_types = (annotation,)
+                    else:
+                        parameter.argument_types = parameter.argument_types + (annotation,)
+                    next_annotation(annotation.__value__, False, True)
                 elif (origin := get_origin(annotation)) in CONTAINER_TYPES:
                     assert kind == ParameterKind.KEYWORD_ONLY, f"A container argument type must be {ParameterKind.KEYWORD_ONLY}"
                     parameter.argument_types = (origin,)
                     parameter._container_annotation = annotation
                 elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
                     args = get_args(annotation)
-                    argument_types: list[type] = []
                     for arg in args:
-                        if not isinstance(arg, type):
+                        if not isinstance(arg, (type, TypeAliasType)):
                             continue
-                        if arg is str:
-                            # This is will always successfully parse, therefore no other types are necessary except possibly NoneType
-                            argument_types.append(str)
-                            if NoneType in args and NoneType not in argument_types:
-                                argument_types.append(NoneType)
-                            break
-                        argument_types.append(arg)
-                    parameter.argument_types = tuple(argument_types)
+                        next_annotation(arg, False, True)
                 else:
                     raise TypeError(f"{annotation} is unsupported")
 
@@ -197,7 +201,7 @@ class CommandParameter:
         return self._custom_attributes
 
     @property
-    def argument_type(self) -> type:
+    def argument_type(self) -> CommandParameterType:
         return self.argument_types[0]
 
     @property
@@ -218,7 +222,7 @@ class CommandParameter:
         self._custom_attributes[key] = value
 
     @staticmethod
-    def type_name(t: type) -> str:
+    def type_name(t: CommandParameterType) -> str:
         if t == NoneType:
             return str(None)
         return t.__name__
@@ -302,7 +306,7 @@ class CommandParameter:
         assert len(self.argument_types), "Parameters must have at least 1 type"
 
 
-def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type, Callable[[str], Any]]) -> Any:
+def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[CommandParameterType, Callable[[str], Any]]) -> Any:
     pre: Callable[[str], str] = lambda s: s
     post: Callable[[Any], Any] = lambda o: o
     err: Callable[[str, Exception], Any | Exception] = lambda _, e: e
@@ -317,8 +321,12 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type
         if t in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
             assert len(item_types) == 1, "Only one item type is currently supported"
             parser: Callable[..., Any] = parsers.get(item_types[0], item_types[0])
-        else:
+        elif isinstance(t, type):
             parser: Callable[..., Any] = parsers.get(t, t)
+        elif t in parsers:
+            parser: Callable[..., Any] = parsers[t]
+        else:
+            continue
 
         try:
             parsed = parser(entry)
@@ -337,6 +345,9 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type
                 raise handled
             parsed = handled
             break
+
+    if parsed is CommandParameter.UNPARSED:
+        raise ParsingError(f"Parse resolution exhausted: {entry} as {parameter.argument_types}")
 
     return post(parsed)
 
@@ -362,7 +373,7 @@ def parse_parameters(
     entries: list[str],
     keyword_prefix: str,
     argument_seperator: str,
-    parsers: dict[type, Callable[[str], Any]]
+    parsers: dict[CommandParameterType, Callable[[str], Any]]
 ) -> tuple[list[Any], dict[str, Any]]:
     arguments: list[Any] = []
     keyword_arguments: dict[str, Any] = {}
