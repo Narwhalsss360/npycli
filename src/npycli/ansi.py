@@ -1,10 +1,9 @@
 from __future__ import annotations
 from typing import Optional, Any
-from copy import deepcopy
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(frozen=True)
 class ANSIControl:
     CSI = "\u001B["
 
@@ -12,6 +11,7 @@ class ANSIControl:
     sequence: str
     no_of_arguments: int = field(default=0)
     no_of_default_arguments: int = field(default=0)
+    instance_without_args: Optional[ANSIControl] = field(default=None)
 
     @staticmethod
     def send(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
@@ -24,18 +24,13 @@ class ANSIControl:
             for i in range(repeat):
                 print(ansi_control, end="", flush=i == repeat - 1)
 
-    def __post_init__(self) -> None:
-        self._with_no_args: Optional[ANSIControl] = None
-
     @property
     def has_args(self) -> bool:
-        return self._with_no_args is not None
+        return self.instance_without_args is not None
 
     @property
     def with_no_args(self) -> ANSIControl:
-        if self._with_no_args is None:
-            return self
-        return self._with_no_args
+        return self.instance_without_args if self.instance_without_args else self
 
     def with_args(self, *args: Any) -> ANSIControl:
         if self.has_args:
@@ -47,23 +42,21 @@ class ANSIControl:
         if len(args) < self.no_of_arguments - self.no_of_default_arguments:
             raise ValueError(f"{ANSIControl.with_args}({self.name}) Not enough arguments supplied")
 
-        with_args: ANSIControl = ANSIControl(**asdict(self))
-        with_args.sequence = ""
+        sequence: str= ""
 
         last: int = len(args) - 1
         for position, arg in enumerate(args):
-            with_args.sequence += str(arg)
+            sequence += str(arg)
             if position != last:
-                with_args.sequence += ";"
-        with_args.sequence += self.sequence
+                sequence += ";"
+        sequence += self.sequence
 
-        with_args._with_no_args = self
-        return with_args
+        return ANSIControl(self.name, sequence, self.no_of_arguments, self.no_of_default_arguments, self)
 
     def __call__(self, *args: Any, repeat: int = 1) -> ANSIControl:
         if self.has_args:
-            assert self._with_no_args is not None
-            replaced_args: ANSIControl = self._with_no_args.with_args(*args)
+            assert self.instance_without_args is not None
+            replaced_args: ANSIControl = self.instance_without_args.with_args(*args)
             ANSIControl.send(replaced_args, repeat)
             return replaced_args
         else:
@@ -268,8 +261,8 @@ SET_STRIKETHROUGH_MODE: int = __constants["SET_STRIKETHROUGH_MODE"]
 
 
 def controls() -> dict[str, ANSIControl]:
-    return deepcopy(__controls)
+    return __controls
 
 
 def constants() -> dict[str, int]:
-    return deepcopy(__constants)
+    return __constants
