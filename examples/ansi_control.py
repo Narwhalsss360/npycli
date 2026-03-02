@@ -1,5 +1,6 @@
 from typing import Any
 from io import StringIO
+from os import get_terminal_size
 from npycli.ansi import (
     send_ansi,
     SAVE_CURRENT_CURSOR_POSITION,
@@ -14,20 +15,23 @@ from npycli.ansi import (
     SCR_RESET
 )
 
-def print_above(*args: Any, **kwargs: Any) -> None:
+def print_above(*args: Any, max_columns: int, current_is_empty: bool = False, **kwargs: Any) -> None:
     '''
     Print above the current line.
     '''
 
     # Use print with file=buffer so this function can be used just like regular print
     buffer: StringIO = StringIO()
-    current_is_empty = kwargs.pop('current_is_empty') if 'current_is_empty' in kwargs else False
-    print(*args, **kwargs, flush=True, file=buffer)
+    print(*args, **kwargs, flush=True, file=buffer, end="")
     output: str = buffer.getvalue()
 
-    if len(output) > 0 and output[-1] == '\n': # Remove trailing \n, if empty newline wanted, supply 2
-        output = output[:-1]
-    line_count: int = output.count('\n') + 1
+    line_count: int = 1
+    line_length: int = 0
+    for c in output:
+        line_length += 1
+        if line_length == max_columns or c == "\n":
+            line_count += 1
+            line_length = 0
 
     send_ansi(SAVE_CURRENT_CURSOR_POSITION)
     if current_is_empty:
@@ -35,7 +39,7 @@ def print_above(*args: Any, **kwargs: Any) -> None:
         send_ansi(CURSOR_UP.with_args(2))
 
     # These ansi control commands may be supplied with arguments
-    print()
+    print("\n" * line_count, end="")
     send_ansi(CURSOR_UP.with_args(line_count))
     # This one doesn't have argument, so we just repeat the command
     send_ansi(INSERT_NEW_LINE, repeat=line_count)
@@ -50,7 +54,7 @@ def print_above(*args: Any, **kwargs: Any) -> None:
 print(1)
 print(2)
 print(4)
-print_above(3, current_is_empty=True) #This line will be an empty line, so current_is_empty = True
+print_above(3, max_columns=get_terminal_size().columns, current_is_empty=True) #This line will be an empty line, so current_is_empty = True
 
 
 SELECT_CHARACTER_RENDITION(SET_BOLD_MODE, FOREGROND_RED, BACKGROND_WHITE)
@@ -58,5 +62,5 @@ SELECT_CHARACTER_RENDITION(SET_BOLD_MODE, FOREGROND_RED, BACKGROND_WHITE)
 print(1)
 print(2)
 print(4, end='')
-print_above(3)
+print_above(3, max_columns=get_terminal_size().columns)
 SELECT_CHARACTER_RENDITION(SCR_RESET)
