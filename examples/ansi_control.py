@@ -1,3 +1,4 @@
+from typing import Any
 from io import StringIO
 from npycli.ansi import (
     send_ansi,
@@ -13,7 +14,7 @@ from npycli.ansi import (
     SCR_RESET
 )
 
-def print_above(*args, **kwargs) -> None:
+def print_above(*args: Any, **kwargs: Any) -> None:
     '''
     Print above the current line.
     '''

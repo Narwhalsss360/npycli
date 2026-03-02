@@ -15,7 +15,7 @@ TAB_WIDTH: int = 4
 cli = CLI('user-items')
 
 
-def open_user_items_file(mode: str) -> IO:
+def open_user_items_file(mode: str) -> IO[Any]:
     return open(USER_ITEMS_FILE, mode, encoding='utf-8')
 
 
@@ -122,7 +122,7 @@ def help_cmd(
         return f"{command_name} is not a command."
 
     if parameter_name is not None:
-        if (parameter := next(filter(lambda p: parameter_name in p.names, command.parameters)), None) is None:
+        if (parameter := next(filter(lambda p: parameter_name in p.names, command.parameters)), None) is None: # type: ignore
             return f"'{parameter_name}' is not a parameter"
         return parameter_help(parameter)
 

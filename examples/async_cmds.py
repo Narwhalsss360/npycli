@@ -1,8 +1,7 @@
 import asyncio
 import inspect
 import shlex
-from asyncio import AbstractEventLoop
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable
 from typing import Optional, Any
 from npycli import CLI, Command, EmptyEntriesError, CLIError
 
@@ -11,18 +10,18 @@ cli = CLI("async program")
 
 
 @cli.cmd("do-async-operation")
-async def do_async_operation(sleeptime: Optional[float] = None) -> int:
+async def do_async_operation(sleeptime: Optional[float] = None) -> None:
     await asyncio.sleep(sleeptime or 1)
     print("Done!")
 
 
-async def cleanup() -> None:
+async def cleanup():
     await asyncio.sleep(1.2)
     return "Done!"
 
 
 @cli.cmd()
-async def quit() -> Callable:
+async def quit() -> Callable[[], None]:
     print("Quiting and cleaning up...")
     await cleanup()
     return quit
