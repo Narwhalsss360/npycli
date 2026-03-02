@@ -15,14 +15,14 @@ from npycli.ansi import (
     SCR_RESET
 )
 
-def print_above(*args: Any, max_columns: int, current_is_empty: bool = False, **kwargs: Any) -> None:
+def print_above(*args: Any, max_columns: int, sep: str | None = " ", current_is_empty: bool = False) -> None:
     '''
     Print above the current line.
     '''
 
     # Use print with file=buffer so this function can be used just like regular print
     buffer: StringIO = StringIO()
-    print(*args, **kwargs, flush=True, file=buffer, end="")
+    print(*args, sep=sep, end="", file=buffer, flush=True)
     output: str = buffer.getvalue()
 
     line_count: int = 1

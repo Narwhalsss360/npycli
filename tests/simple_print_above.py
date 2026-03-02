@@ -5,14 +5,14 @@ from asyncio import run, to_thread, create_task, Task, sleep, CancelledError
 from npycli.ansi import send_ansi, SAVE_CURRENT_CURSOR_POSITION, CURSOR_DOWN, CURSOR_UP, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION
 
 
-def print_above(*args: Any, max_columns: int, current_is_empty: bool = False, **kwargs: Any) -> None:
+def print_above(*args: Any, max_columns: int, sep: str | None = " ", current_is_empty: bool = False) -> None:
     '''
     Print above the current line.
     '''
 
     # Use print with file=buffer so this function can be used just like regular print
     buffer: StringIO = StringIO()
-    print(*args, **kwargs, flush=True, file=buffer, end="")
+    print(*args, sep=sep, end="", file=buffer, flush=True)
     output: str = buffer.getvalue()
 
     line_count: int = 1
