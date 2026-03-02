@@ -1,11 +1,12 @@
 from __future__ import annotations
 from typing import Optional, Any
+from copy import deepcopy
 from dataclasses import dataclass, field, asdict
 
 
 @dataclass
 class ANSIControl:
-    CSI = '\u001B['
+    CSI = "\u001B["
 
     name: str
     sequence: str
@@ -16,12 +17,12 @@ class ANSIControl:
     def send(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
         if isinstance(ansi_control, ANSIControl):
             for i in range(repeat):
-                print(str(ansi_control), end='', flush=i == repeat - 1)
+                print(str(ansi_control), end="", flush=i == repeat - 1)
         else:
             if not ansi_control.startswith(ANSIControl.CSI):
-                raise ValueError(f'Sequence {ansi_control} does not start with ANSI CSI')
+                raise ValueError(f"Sequence {ansi_control} does not start with ANSI CSI")
             for i in range(repeat):
-                print(ansi_control, end='', flush=i == repeat - 1)
+                print(ansi_control, end="", flush=i == repeat - 1)
 
     def __post_init__(self) -> None:
         self._with_no_args: Optional[ANSIControl] = None
@@ -41,19 +42,19 @@ class ANSIControl:
             return self
 
         if len(args) > self.no_of_arguments:
-            raise ValueError(f'{ANSIControl.with_args}({self.name}) Too many arguments supplied')
+            raise ValueError(f"{ANSIControl.with_args}({self.name}) Too many arguments supplied")
 
         if len(args) < self.no_of_arguments - self.no_of_default_arguments:
-            raise ValueError(f'{ANSIControl.with_args}({self.name}) Not enough arguments supplied')
+            raise ValueError(f"{ANSIControl.with_args}({self.name}) Not enough arguments supplied")
 
         with_args: ANSIControl = ANSIControl(**asdict(self))
-        with_args.sequence = ''
+        with_args.sequence = ""
 
         last: int = len(args) - 1
         for position, arg in enumerate(args):
             with_args.sequence += str(arg)
             if position != last:
-                with_args.sequence += ';'
+                with_args.sequence += ";"
         with_args.sequence += self.sequence
 
         with_args._with_no_args = self
@@ -72,78 +73,203 @@ class ANSIControl:
     def __str__(self) -> str:
         if not self.has_args:
             return str(self.with_args())
-        return f'{ANSIControl.CSI}{self.sequence}'
+        return f"{ANSIControl.CSI}{self.sequence}"
 
 
 def send_ansi(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
     ANSIControl.send(ansi_control, repeat)
 
 
-CURSOR_UP: ANSIControl = ANSIControl('CURSOR_UP', 'A', 1, 1)
-CURSOR_DOWN: ANSIControl = ANSIControl('CURSOR_DOWN', 'B', 1, 1)
-CURSOR_FORWARD: ANSIControl = ANSIControl('CURSOR_FORWARD', 'C', 1, 1)
-CURSOR_BACK: ANSIControl = ANSIControl('CURSOR_BACK', 'D', 1, 1)
-CURSOR_NEXT_LINE: ANSIControl = ANSIControl('CURSOR_NEXT_LINE', 'E', 1, 1)
-CURSOR_PREVIOUS_LINE: ANSIControl = ANSIControl('CURSOR_PREVIOUS_LINE', 'F', 1, 1)
-CURSOR_HORIZONTAL_ABSOLUTE: ANSIControl = ANSIControl('CURSOR_HORIZONTAL_ABSOLUTE', 'G', 1, 1)
-CURSOR_POSITION: ANSIControl = ANSIControl('CURSOR_POSITION', 'H', 2)
-ERASE_IN_DISPLAY: ANSIControl = ANSIControl('ERASE_IN_DISPLAY', 'J', 1, 1)
-ERASE_IN_DISPLAY_TO_END: int = 0
-ERASE_IN_DISPLAY_TO_BEGINNING: int = 1
-ERASE_IN_DISPLAY_ALL: int = 2
-ERASE_IN_LINE: ANSIControl = ANSIControl('ERASE_IN_LINE', 'K', 1, 1)
-ERASE_IN_LINE_END: int = 0
-ERASE_IN_LINE_BEGINNING: int = 1
-ERASE_IN_LINE_ALL: int = 2
-SCROLL_UP: ANSIControl = ANSIControl('SCROLL_UP', 'T', 1, 1)
-SCROLL_DOWN: ANSIControl = ANSIControl('SCROLL_DOWN', 'S', 1, 1)
-HORIZONTAL_VERTICAL_POSITION: ANSIControl = ANSIControl('HORIZONTAL_VERTICAL_POSITION', 'f', 2)
-SELECT_CHARACTER_RENDITION: ANSIControl = ANSIControl('SELECT_CHARACTER_RENDITION', 'm', 3, 3)
-AUX_PORT_ON: ANSIControl = ANSIControl('AUX_PORT_ON', '5i')
-AUX_PORT_OFF: ANSIControl = ANSIControl('AUX_PORT_OFF', '4i')
-DEVICE_STATUS_REPORT: ANSIControl = ANSIControl('DEVICE_STATUS_REPORT', '6n')
-
-INSERT_NEW_LINE: ANSIControl = ANSIControl('INSERT_NEW_LINE', 'L')
-
-SAVE_CURRENT_CURSOR_POSITION: ANSIControl = ANSIControl('SAVE_CURRENT_CURSOR_POSITION', 's')
-RESTORE_SAVED_CURSOR_POSITION: ANSIControl = ANSIControl('RESTORE_SAVED_CURSOR_POSITION', 'u')
-SHOW_CURSOR: ANSIControl = ANSIControl('SHOW_CURSOR', '?25h')
-HIDE_CURSOR: ANSIControl = ANSIControl('HIDE_CURSOR', '?25l')
-
-REMOVE_LINE: ANSIControl = ANSIControl('REMOVE_LINE', 'M')
-REMOVE_CHARACTER: ANSIControl = ANSIControl('REMOVE_CHARACTER', 'P')
+__controls: dict[str, ANSIControl] = {}
+__constants: dict[str, int] = {}
 
 
-SCR_RESET: int = 0
+__controls["CURSOR_UP"] = ANSIControl("CURSOR_UP", "A", 1, 1)
+CURSOR_UP: ANSIControl = __controls["CURSOR_UP"]
+
+__controls["CURSOR_DOWN"] = ANSIControl("CURSOR_DOWN", "B", 1, 1)
+CURSOR_DOWN: ANSIControl = __controls["CURSOR_DOWN"]
+
+__controls["CURSOR_FORWARD"] = ANSIControl("CURSOR_FORWARD", "C", 1, 1)
+CURSOR_FORWARD: ANSIControl = __controls["CURSOR_FORWARD"]
+
+__controls["CURSOR_BACK"] = ANSIControl("CURSOR_BACK", "D", 1, 1)
+CURSOR_BACK: ANSIControl = __controls["CURSOR_BACK"]
+
+__controls["CURSOR_NEXT_LINE"] = ANSIControl("CURSOR_NEXT_LINE", "E", 1, 1)
+CURSOR_NEXT_LINE: ANSIControl = __controls["CURSOR_NEXT_LINE"]
+
+__controls["CURSOR_PREVIOUS_LINE"] = ANSIControl("CURSOR_PREVIOUS_LINE", "F", 1, 1)
+CURSOR_PREVIOUS_LINE: ANSIControl = __controls["CURSOR_PREVIOUS_LINE"]
+
+__controls["CURSOR_HORIZONTAL_ABSOLUTE"] = ANSIControl("CURSOR_HORIZONTAL_ABSOLUTE", "G", 1, 1)
+CURSOR_HORIZONTAL_ABSOLUTE: ANSIControl = __controls["CURSOR_HORIZONTAL_ABSOLUTE"]
+
+__controls["CURSOR_POSITION"] = ANSIControl("CURSOR_POSITION", "H", 2)
+CURSOR_POSITION: ANSIControl = __controls["CURSOR_POSITION"]
+
+__controls["ERASE_IN_DISPLAY"] = ANSIControl("ERASE_IN_DISPLAY", "J", 1, 1)
+ERASE_IN_DISPLAY: ANSIControl = __controls["ERASE_IN_DISPLAY"]
+
+__constants["ERASE_IN_DISPLAY_TO_END"] = 0
+ERASE_IN_DISPLAY_TO_END: int = __constants["ERASE_IN_DISPLAY_TO_END"]
+
+__constants["ERASE_IN_DISPLAY_TO_BEGINNING"] = 1
+ERASE_IN_DISPLAY_TO_BEGINNING: int = __constants["ERASE_IN_DISPLAY_TO_BEGINNING"]
+
+__constants["ERASE_IN_DISPLAY_ALL"] = 2
+ERASE_IN_DISPLAY_ALL: int = __constants["ERASE_IN_DISPLAY_ALL"]
+
+__controls["ERASE_IN_LINE"] = ANSIControl("ERASE_IN_LINE", "K", 1, 1)
+ERASE_IN_LINE: ANSIControl = __controls["ERASE_IN_LINE"]
+
+__constants["ERASE_IN_LINE_END"] = 0
+ERASE_IN_LINE_END: int = __constants["ERASE_IN_LINE_END"]
+
+__constants["ERASE_IN_LINE_BEGINNING"] = 1
+ERASE_IN_LINE_BEGINNING: int = __constants["ERASE_IN_LINE_BEGINNING"]
+
+__constants["ERASE_IN_LINE_ALL"] = 2
+ERASE_IN_LINE_ALL: int = __constants["ERASE_IN_LINE_ALL"]
+
+__controls["SCROLL_UP"] = ANSIControl("SCROLL_UP", "T", 1, 1)
+SCROLL_UP: ANSIControl = __controls["SCROLL_UP"]
+
+__controls["SCROLL_DOWN"] = ANSIControl("SCROLL_DOWN", "S", 1, 1)
+SCROLL_DOWN: ANSIControl = __controls["SCROLL_DOWN"]
+
+__controls["HORIZONTAL_VERTICAL_POSITION"] = ANSIControl("HORIZONTAL_VERTICAL_POSITION", "f", 2)
+HORIZONTAL_VERTICAL_POSITION: ANSIControl = __controls["HORIZONTAL_VERTICAL_POSITION"]
+
+__controls["SELECT_CHARACTER_RENDITION"] = ANSIControl("SELECT_CHARACTER_RENDITION", "m", 3, 3)
+SELECT_CHARACTER_RENDITION: ANSIControl = __controls["SELECT_CHARACTER_RENDITION"]
+
+__controls["AUX_PORT_ON"] = ANSIControl("AUX_PORT_ON", "5i")
+AUX_PORT_ON: ANSIControl = __controls["AUX_PORT_ON"]
+
+__controls["AUX_PORT_OFF"] = ANSIControl("AUX_PORT_OFF", "4i")
+AUX_PORT_OFF: ANSIControl = __controls["AUX_PORT_OFF"]
+
+__controls["DEVICE_STATUS_REPORT"] = ANSIControl("DEVICE_STATUS_REPORT", "6n")
+DEVICE_STATUS_REPORT: ANSIControl = __controls["DEVICE_STATUS_REPORT"]
 
 
-FOREGROND_BLACK: int = 30
-FOREGROND_RED: int = 31
-FOREGROND_GREEN: int = 32
-FOREGROND_YELLOW: int = 33
-FOREGROND_BLUE: int = 34
-FOREGROND_MAGENTA: int = 35
-FOREGROND_CYAN: int = 36
-FOREGROND_WHITE: int = 37
-FOREGROND_DEFAULT: int = 38
+__controls["INSERT_NEW_LINE"] = ANSIControl("INSERT_NEW_LINE", "L")
+INSERT_NEW_LINE: ANSIControl = __controls["INSERT_NEW_LINE"]
 
 
-BACKGROND_BLACK: int = FOREGROND_BLACK + 10
-BACKGROND_RED: int = FOREGROND_RED + 10
-BACKGROND_GREEN: int = FOREGROND_GREEN + 10
-BACKGROND_YELLOW: int = FOREGROND_YELLOW + 10
-BACKGROND_BLUE: int = FOREGROND_BLUE + 10
-BACKGROND_MAGENTA: int = FOREGROND_MAGENTA + 10
-BACKGROND_CYAN: int = FOREGROND_CYAN + 10
-BACKGROND_WHITE: int = FOREGROND_WHITE + 10
-BACKGROND_DEFAULT: int = FOREGROND_DEFAULT + 10
+__controls["SAVE_CURRENT_CURSOR_POSITION"] = ANSIControl("SAVE_CURRENT_CURSOR_POSITION", "s")
+SAVE_CURRENT_CURSOR_POSITION: ANSIControl = __controls["SAVE_CURRENT_CURSOR_POSITION"]
+
+__controls["RESTORE_SAVED_CURSOR_POSITION"] = ANSIControl("RESTORE_SAVED_CURSOR_POSITION", "u")
+RESTORE_SAVED_CURSOR_POSITION: ANSIControl = __controls["RESTORE_SAVED_CURSOR_POSITION"]
+
+__controls["SHOW_CURSOR"] = ANSIControl("SHOW_CURSOR", "?25h")
+SHOW_CURSOR: ANSIControl = __controls["SHOW_CURSOR"]
+
+__controls["HIDE_CURSOR"] = ANSIControl("HIDE_CURSOR", "?25l")
+HIDE_CURSOR: ANSIControl = __controls["HIDE_CURSOR"]
 
 
-SET_BOLD_MODE: int = 1
-SET_DIM_MODE: int = 2
-SET_ITALIC_MODE: int = 3
-SET_UNDERLINE_MODE: int = 4
-SET_BLINKING_MODE: int = 5
-SET_INVERSE_MODE: int = 7
-SET_INVISIBLE_MODE: int = 8
-SET_STRIKETHROUGH_MODE: int = 9
+__controls["REMOVE_LINE"] = ANSIControl("REMOVE_LINE", "M")
+REMOVE_LINE: ANSIControl = __controls["REMOVE_LINE"]
+
+__controls["REMOVE_CHARACTER"] = ANSIControl("REMOVE_CHARACTER", "P")
+REMOVE_CHARACTER: ANSIControl = __controls["REMOVE_CHARACTER"]
+
+
+
+__constants["SCR_RESET"] = 0
+SCR_RESET: int = __constants["SCR_RESET"]
+
+
+
+__constants["FOREGROND_BLACK"] = 30
+FOREGROND_BLACK: int = __constants["FOREGROND_BLACK"]
+
+__constants["FOREGROND_RED"] = 31
+FOREGROND_RED: int = __constants["FOREGROND_RED"]
+
+__constants["FOREGROND_GREEN"] = 32
+FOREGROND_GREEN: int = __constants["FOREGROND_GREEN"]
+
+__constants["FOREGROND_YELLOW"] = 33
+FOREGROND_YELLOW: int = __constants["FOREGROND_YELLOW"]
+
+__constants["FOREGROND_BLUE"] = 34
+FOREGROND_BLUE: int = __constants["FOREGROND_BLUE"]
+
+__constants["FOREGROND_MAGENTA"] = 35
+FOREGROND_MAGENTA: int = __constants["FOREGROND_MAGENTA"]
+
+__constants["FOREGROND_CYAN"] = 36
+FOREGROND_CYAN: int = __constants["FOREGROND_CYAN"]
+
+__constants["FOREGROND_WHITE"] = 37
+FOREGROND_WHITE: int = __constants["FOREGROND_WHITE"]
+
+__constants["FOREGROND_DEFAULT"] = 38
+FOREGROND_DEFAULT: int = __constants["FOREGROND_DEFAULT"]
+
+
+
+__constants["BACKGROND_BLACK"] = FOREGROND_BLACK + 10
+BACKGROND_BLACK: int = __constants["BACKGROND_BLACK"]
+
+__constants["BACKGROND_RED"] = FOREGROND_RED + 10
+BACKGROND_RED: int = __constants["BACKGROND_RED"]
+
+__constants["BACKGROND_GREEN"] = FOREGROND_GREEN + 10
+BACKGROND_GREEN: int = __constants["BACKGROND_GREEN"]
+
+__constants["BACKGROND_YELLOW"] = FOREGROND_YELLOW + 10
+BACKGROND_YELLOW: int = __constants["BACKGROND_YELLOW"]
+
+__constants["BACKGROND_BLUE"] = FOREGROND_BLUE + 10
+BACKGROND_BLUE: int = __constants["BACKGROND_BLUE"]
+
+__constants["BACKGROND_MAGENTA"] = FOREGROND_MAGENTA + 10
+BACKGROND_MAGENTA: int = __constants["BACKGROND_MAGENTA"]
+
+__constants["BACKGROND_CYAN"] = FOREGROND_CYAN + 10
+BACKGROND_CYAN: int = __constants["BACKGROND_CYAN"]
+
+__constants["BACKGROND_WHITE"] = FOREGROND_WHITE + 10
+BACKGROND_WHITE: int = __constants["BACKGROND_WHITE"]
+
+__constants["BACKGROND_DEFAULT"] = FOREGROND_DEFAULT + 10
+BACKGROND_DEFAULT: int = __constants["BACKGROND_DEFAULT"]
+
+
+
+__constants["SET_BOLD_MODE"] = 1
+SET_BOLD_MODE: int = __constants["SET_BOLD_MODE"]
+
+__constants["SET_DIM_MODE"] = 2
+SET_DIM_MODE: int = __constants["SET_DIM_MODE"]
+
+__constants["SET_ITALIC_MODE"] = 3
+SET_ITALIC_MODE: int = __constants["SET_ITALIC_MODE"]
+
+__constants["SET_UNDERLINE_MODE"] = 4
+SET_UNDERLINE_MODE: int = __constants["SET_UNDERLINE_MODE"]
+
+__constants["SET_BLINKING_MODE"] = 5
+SET_BLINKING_MODE: int = __constants["SET_BLINKING_MODE"]
+
+__constants["SET_INVERSE_MODE"] = 7
+SET_INVERSE_MODE: int = __constants["SET_INVERSE_MODE"]
+
+__constants["SET_INVISIBLE_MODE"] = 8
+SET_INVISIBLE_MODE: int = __constants["SET_INVISIBLE_MODE"]
+
+__constants["SET_STRIKETHROUGH_MODE"] = 9
+SET_STRIKETHROUGH_MODE: int = __constants["SET_STRIKETHROUGH_MODE"]
+
+
+def controls() -> dict[str, ANSIControl]:
+    return deepcopy(__controls)
+
+
+def constants() -> dict[str, int]:
+    return deepcopy(__constants)
