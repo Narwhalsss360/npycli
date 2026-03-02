@@ -6,7 +6,7 @@ from npycli.ansi import ANSIControl, DEVICE_STATUS_REPORT
 DEVICE_STATUS_REPORT_RE = r"\x1b\[[0-9]+;[0-9]+R"
 
 
-def extract_position(report: str) -> tuple[int, int]:
+def extract_position_from_report(report: str) -> tuple[int, int]:
     if not match(DEVICE_STATUS_REPORT_RE, report):
         raise ValueError(f"Did not get device status report: {repr(report)}")
 
@@ -48,7 +48,7 @@ def posix_main() -> None:
             break
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, initial_flags)
 
-    print(extract_position(report))
+    print(extract_position_from_report(report))
 
 
 def win_main() -> None:
@@ -73,7 +73,7 @@ def win_main() -> None:
         if c == "R":
             break
 
-    print(extract_position(report))
+    print(extract_position_from_report(report))
 
 
 if __name__ == "__main__":
