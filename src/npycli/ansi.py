@@ -337,4 +337,15 @@ def extract_ansi(char_iter: Iterable[str], max_iterations: int = -1) -> tuple[Op
             continue
 
         args: tuple[str, ...] = extract_asni_args(s, control.sequence, len(s))
-        return ANSIControl(control.name, f"{s}{control.sequence}", len(args), control.no_of_default_arguments, control), args, start_index, end_index + len(control.sequence)
+        return (
+            ANSIControl(
+                control.name,
+                f"{s}{control.sequence}",
+                len(args),
+                control.no_of_default_arguments,
+                control if args else None
+            ),
+            args,
+            start_index,
+            end_index + len(control.sequence)
+        )
