@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Iterable
 from typing import Optional, Any
 from dataclasses import dataclass, field
 
@@ -146,6 +147,9 @@ AUX_PORT_OFF: ANSIControl = __controls["AUX_PORT_OFF"]
 __controls["DEVICE_STATUS_REPORT"] = ANSIControl("DEVICE_STATUS_REPORT", "6n")
 DEVICE_STATUS_REPORT: ANSIControl = __controls["DEVICE_STATUS_REPORT"]
 
+__controls["CURSOR_POSITION_REPORT"] = ANSIControl("CURSOR_POSITION_REPORT", "R")
+CURSOR_POSITION_REPORT: ANSIControl = __controls["CURSOR_POSITION_REPORT"]
+
 
 __controls["INSERT_NEW_LINE"] = ANSIControl("INSERT_NEW_LINE", "L")
 INSERT_NEW_LINE: ANSIControl = __controls["INSERT_NEW_LINE"]
@@ -266,3 +270,71 @@ def controls() -> dict[str, ANSIControl]:
 
 def constants() -> dict[str, int]:
     return __constants
+
+
+def extract_asni_args(char_iter: Iterable[str], main_control_sequence: str, max_iterations: int = -1) -> tuple[str, ...]:
+    args: list[str] = []
+    arg_index: int = -1
+    iterations: int = 0
+    for c in char_iter:
+        if iterations == max_iterations:
+            raise StopIteration
+
+        iterations += 1
+        if len(c) != 1:
+            raise ValueError("Must be a character iterartor")
+        if arg_index == -1:
+            args.append("")
+            arg_index = 0
+        if c == ";":
+            args.append("")
+            arg_index += 1
+            continue
+        args[arg_index] += c
+        if args[arg_index].endswith(main_control_sequence):
+            args[arg_index] = args[arg_index][0:-len(main_control_sequence)]
+            break
+    return tuple(args)
+
+
+def extract_ansi(char_iter: Iterable[str], max_iterations: int = -1) -> tuple[Optional[ANSIControl], tuple[str, ...], int, int]:
+    iterations: int = 0
+    s: str = ""
+    start_index: int = 0
+    iterator = iter(char_iter)
+    while not s.endswith(ANSIControl.CSI):
+        if iterations == max_iterations:
+            raise StopIteration
+
+        try:
+            c: str = next(iterator)
+        except StopIteration:
+            return None, (), -1, -1
+
+        if len(c) != 1:
+            raise ValueError("Must be a character iterartor")
+        s += c
+        start_index += 1
+        iterations += 1
+
+    end_index: int = start_index
+    start_index -= len(ANSIControl.CSI)
+    s = ""
+
+    while True:
+        if iterations == max_iterations:
+            raise StopIteration
+
+        try:
+            c: str = next(iterator)
+        except StopIteration:
+            return None, (), -1, -1
+        s += c
+        iterations += 1
+
+        if (control := next(filter(lambda a: s.endswith(a.sequence), controls().values()), None)) is None:
+            end_index += 1
+            continue
+
+        args: tuple[str, ...] = extract_asni_args(s, control.sequence, len(s))
+        return ANSIControl(control.name, f"{s}{control.sequence}", len(args), control.no_of_default_arguments, control), args, start_index, end_index + len(control.sequence)

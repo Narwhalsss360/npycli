@@ -1,6 +1,6 @@
 import os
 from re import match
-from npycli.ansi import ANSIControl, DEVICE_STATUS_REPORT
+from npycli.ansi import ANSIControl, DEVICE_STATUS_REPORT, extract_ansi
 
 
 DEVICE_STATUS_REPORT_RE = r"\x1b\[[0-9]+;[0-9]+R"
@@ -64,16 +64,24 @@ def win_main() -> None:
                 c = msvcrt.getch()
             break
 
-    flush_keypress()
-    report: str = ""
-    ANSIControl.send(DEVICE_STATUS_REPORT)
-    while True:
-        c = msvcrt.getch().decode()
-        report += c
-        if c == "R":
-            break
+    def getch_generator(max_iterations: int = -1):
+        iterations: int = 0
+        while True:
+            if iterations == max_iterations:
+                raise StopIteration
+            yield msvcrt.getch().decode()
+            iterations += 1
 
-    print(extract_position_from_report(report))
+    flush_keypress()
+    ANSIControl.send(DEVICE_STATUS_REPORT)
+    control, args, start_index, end_index = extract_ansi(getch_generator(16))
+    if control is None:
+        print("Error reading response!")
+        return
+
+    print(f"Read control sequence {repr(control)}:")
+    print(f"\t{tuple(int(arg) for arg in args)}")
+    print(f"\tLength: {end_index - start_index}")
 
 
 if __name__ == "__main__":
