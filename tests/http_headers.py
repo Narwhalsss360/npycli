@@ -1,12 +1,12 @@
 from sys import argv
 from typing import Annotated
 from npycli import Command
-from npycli.parameters import Alias
+from npycli.parameters import Alias, Description
 
 
 def http_headers(
     *,
-    headers: Annotated[tuple[str], Alias("header", private=True)]
+    headers: Annotated[tuple[str], Description("Specify this keyword argument multiple times"), Alias("header", private=True)]
 ):
     for header in headers:
         print(f"{header}\\r\\n")

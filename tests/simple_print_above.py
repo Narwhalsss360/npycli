@@ -1,12 +1,13 @@
+from typing import Any
 from sys import argv
 from io import StringIO
 from threading import Thread
 from time import time, sleep
-from npycli.ansi import send_ansi, SAVE_CURRENT_CURSOR_POSITION, SCROLL_DOWN, CURSOR_UP, INSERT_NEW_LINE, RESTORE_SAVED_CURRENT_CURSOR_POSITION
+from npycli.ansi import send_ansi, SAVE_CURRENT_CURSOR_POSITION, SCROLL_DOWN, CURSOR_UP, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION
 from npycli.command import Command
 
 
-def print_above(*args, **kwargs) -> None:
+def print_above(*args: Any, **kwargs: Any) -> None:
     buffer: StringIO = StringIO()
     print(*args, **kwargs, flush=True, file=buffer)
     output: str = buffer.getvalue()
@@ -20,7 +21,7 @@ def print_above(*args, **kwargs) -> None:
     send_ansi(CURSOR_UP.with_args(line_count))
     send_ansi(INSERT_NEW_LINE, repeat=line_count)
     print(output, end='', flush=True)
-    send_ansi(RESTORE_SAVED_CURRENT_CURSOR_POSITION)
+    send_ansi(RESTORE_SAVED_CURSOR_POSITION)
 
 
 def print_on_interval(total: int, interval: int) -> None:
