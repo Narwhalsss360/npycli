@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Any
 from dataclasses import dataclass, field, asdict
 
 
@@ -36,7 +36,7 @@ class ANSIControl:
             return self
         return self._with_no_args
 
-    def with_args(self, *args) -> ANSIControl:
+    def with_args(self, *args: Any) -> ANSIControl:
         if self.has_args:
             return self
 
@@ -59,7 +59,7 @@ class ANSIControl:
         with_args._with_no_args = self
         return with_args
 
-    def __call__(self, *args, repeat: int = 1) -> ANSIControl:
+    def __call__(self, *args: Any, repeat: int = 1) -> ANSIControl:
         if self.has_args:
             assert self._with_no_args is not None
             replaced_args: ANSIControl = self._with_no_args.with_args(*args)
