@@ -13,13 +13,13 @@ class Command:
     __CMD_ATTR__ = '__cmd__'
     __CMD_HOOKS_ATTR__ = '__cmd_hooks__'
 
-    function: Callable
+    function: Callable[..., Any]
     names: tuple[str, ...]
     help: Optional[str] = field(default=None)
     kwarg_prefix: str = field(default_factory=lambda: '--')
 
     @staticmethod
-    def create(function: Callable, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None,
+    def create(function: Callable[..., Any], name: Optional[str] = None, names: Optional[tuple[str, ...]] = None,
                help: Optional[str] = None, kwarg_prefix: Optional[str] = None) -> Command:
         """
         Create a Command, wrapper for using either `name` or `names`
@@ -111,7 +111,7 @@ class Command:
     def _validate_data(self) -> None:
         if not callable(self.function):
             raise TypeError(f'{Command._validate_data} -> {self.function} is not callable.')
-        if not isinstance(self.names, tuple) or not all(isinstance(name, str) for name in self.names):
+        if not isinstance(self.names, tuple) or not all(isinstance(name, str) for name in self.names): # type: ignore
             raise TypeError(f'{Command} names must be a {tuple} of {str}.')
         if not self.names:
             raise ValueError(f'{Command} names must not be empty.')
@@ -121,7 +121,7 @@ class Command:
                     raise ValueError(f'Name for {self.function} cannot contain whitespace: {name}')
         if getattr(self.function, Command.__CMD_ATTR__, None) is not None:
             raise TypeError(f'Function {self.function} is already a {Command}.')
-        if self.help is not None and not isinstance(self.help, str):
+        if self.help is not None and not isinstance(self.help, str): # type: ignore
             raise TypeError(f'{Command} help must be a {str}.')
 
     def _attach_self(self) -> None:
@@ -235,17 +235,17 @@ class Command:
         return self.details
 
 
-def is_cmd(function: Callable) -> bool:
+def is_cmd(function: Callable[..., Any]) -> bool:
     return hasattr(function, Command.__CMD_ATTR__)
 
 
-def cmd(function: Callable) -> Command:
+def cmd(function: Callable[..., Any]) -> Command:
     if is_cmd(function):
         return getattr(function, Command.__CMD_ATTR__)
     raise ValueError(f"{function} is not a command. Use {is_cmd}.")
 
 
-def cmd_hook(function: Callable, callback: Callable[[Command], None]) -> None:
+def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) -> None:
     if is_cmd(function):
         raise \
             TypeError(f'function {function} is already not a future command, it is already a command: {cmd(function)}')
