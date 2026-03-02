@@ -8,15 +8,15 @@ from .errors import EmptyEntriesError, CommandDoesNotExistError, CLIError
 class CLI:
     def __init__(self, title: Optional[str] = None, prompt_marker: Optional[str] = None,
                  kwarg_prefix: Optional[str] = None, parsers: Optional[dict[type, Callable[[str], Any]]] = None,
-                 env: Optional[dict] = None, retval_handler: Optional[Callable[[Command, Any], Optional[Any]]] = None,
-                 error_handler: Optional[Callable[[Command, Exception], Optional[Any]]] = None) -> None:
+                 env: Optional[dict[Any, Any]] = None, retval_handler: Optional[Callable[[Command, Any], Any]] = None,
+                 error_handler: Optional[Callable[[Command, Exception], Any]] = None) -> None:
         self.title: str = title or 'CLI'
         self.prompt_marker: str = prompt_marker or '>'
         self.kwarg_prefix: str = kwarg_prefix or '--'
         self.parsers: dict[type, Callable[[str], Any]] = parsers or {}
-        self.env: dict = env or {}
-        self._retval_handler: Optional[Callable[[Command, Any], Optional[Any]]] = retval_handler
-        self._error_handler: Optional[Callable[[Command, Exception], Optional[Any]]] = error_handler
+        self.env: dict[Any, Any] = env or {}
+        self._retval_handler: Optional[Callable[[Command, Any], Any]] = retval_handler
+        self._error_handler: Optional[Callable[[Command, Exception], Any]] = error_handler
         self._commands: list[Command] = []
 
     @property
@@ -59,7 +59,7 @@ class CLI:
         self._commands.append(command)
 
     def cmd(self, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None, help: Optional[str] = None) \
-            -> Callable[[Callable], Callable]:
+            -> Callable[[Callable[..., Any]], Callable[..., Optional[Any]]]:
         """
         Curry function that creates a decorator that creates a `Command` from the function.
         :param name: Name of `Command`
@@ -68,7 +68,7 @@ class CLI:
         :return: Decorator
         """
 
-        def decorator(function: Callable) -> Callable:
+        def decorator(function: Callable[..., Any]) -> Callable[..., Optional[Any]]:
             self.add_command(
                 Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix)
             )
@@ -76,7 +76,7 @@ class CLI:
 
         return decorator
 
-    def retvals(self) -> Callable[[Callable[[Command, Any], None]], Callable]:
+    def retvals(self) -> Callable[[Callable[[Command, Any], None]], Callable[..., Optional[Any]]]:
         """
         Curry function that creates a decorator to specify a return value handler function.
         :return: Decorator
@@ -88,7 +88,7 @@ class CLI:
 
         return decorator
 
-    def errors(self) -> Callable[[Callable[[Command, Exception], None]], Callable]:
+    def errors(self) -> Callable[[Callable[[Command, Exception], None]], Callable[..., Any]]:
         """
         Curry function that creates a decorator to specify an error handler function.
         :return: Decorator
@@ -101,7 +101,7 @@ class CLI:
 
         return decorator
 
-    def exec(self, entries: list[str]) -> Optional[Any]:
+    def exec(self, entries: list[str]) -> Any:
         """
         Execute a command from specified `entries`.
         :param entries: Command name and arguments.
@@ -131,7 +131,7 @@ class CLI:
             return self._retval_handler(command, retval)
         return retval
 
-    def prompt(self) -> Optional[Any]:
+    def prompt(self) -> Any:
         """
         Prompt the user for entries to `exec` on this CLI.
         :return: Command function return value
