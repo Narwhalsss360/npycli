@@ -1,6 +1,7 @@
 import builtins
 from collections.abc import Callable
-from typing import Optional, Any, get_args, Type
+from types import UnionType
+from typing import Optional, Any, get_args, Type, TypeAliasType, get_origin, Literal
 from itertools import zip_longest
 from enum import Enum
 from .errors import MissingKeywordArgumentValueError, ParsingError, TooManyArgumentsError
@@ -92,6 +93,29 @@ def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_t
             raise ParsingError(f"An error ({repr(exc)}) occurred parsing '{arg}' as {arg_type}.") from exc
 
     return args, kwargs
+
+
+def create_literal_parser(literal_type: TypeAliasType | UnionType) -> Callable[[str], Any]:
+    if isinstance(literal_type, TypeAliasType):
+        return create_literal_parser(literal_type.__value__)
+
+    if get_origin(literal_type) != Literal:
+        raise TypeError("Argument must be of origin 'Literal'")
+
+    if not all(isinstance(t, (int, str)) for t in get_args(literal_type)):
+        raise TypeError("Only supported arguments of 'Literal' are str and int.")
+
+    def parser(s: str) -> Any:
+        for literal_value in get_args(literal_type):
+            if isinstance(literal_value, str):
+                if s == literal_value:
+                    return literal_value
+            else:
+                assert isinstance(literal_value, int)
+                if int(s) == literal_value:
+                    return literal_value
+        raise ValueError(f"{s} was not one of {repr(get_args(literal_type))}")
+    return parser
 
 
 def create_enum_parser[T](enum_type: Type[T]) -> Callable[[str], T]:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from types import NoneType, UnionType
 from collections.abc import Callable
-from typing import Any, Annotated, Type, Union, TypeAliasType, get_origin, get_args
+from typing import Any, Annotated, Type, Union, TypeAliasType, get_origin, get_args, Literal
 from inspect import _ParameterKind, Parameter # type: ignore
 from dataclasses import dataclass, field
 from .errors import ParsingError
@@ -160,6 +160,11 @@ class CommandParameter:
                         if not isinstance(arg, (type, TypeAliasType)):
                             continue
                         next_annotation(arg, False, True)
+                elif get_origin(annotation) == Literal:
+                    if not appending or parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+                        parameter.argument_types = (annotation,)
+                    else:
+                        parameter.argument_types = parameter.argument_types + (annotation,)
                 else:
                     raise TypeError(f"{annotation} is unsupported")
 
@@ -225,6 +230,8 @@ class CommandParameter:
     def type_name(t: CommandParameterType) -> str:
         if t == NoneType:
             return str(None)
+        if get_origin(t) == Literal:
+            return f"Literal[{", ".join(repr(arg) for arg in get_args(t))}]"
         return t.__name__
 
     def annotation_preview_fallback(self) -> str:
