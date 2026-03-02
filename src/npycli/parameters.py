@@ -2,7 +2,7 @@ from __future__ import annotations
 from types import NoneType, UnionType
 from collections.abc import Callable
 from typing import Any, Annotated, Type, Union, get_origin, get_args
-from inspect import _ParameterKind, Parameter
+from inspect import _ParameterKind, Parameter # type: ignore
 from dataclasses import dataclass, field
 from .errors import ParsingError
 
@@ -86,7 +86,7 @@ class CustomAttrbute:
         return repr(self)
 
 
-ContainerTypes = (list | tuple)
+ContainerTypes = (list[Any] | tuple[Any, ...])
 CONTAINER_TYPES: tuple[type, ...] = list, tuple
 
 
@@ -175,6 +175,7 @@ class CommandParameter:
 
     @property
     def name(self) -> str:
+        assert self.names
         return self.names[0]
 
     @property
@@ -315,9 +316,9 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[type
     for i, t in enumerate(parameter.argument_types):
         if t in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
             assert len(item_types) == 1, "Only one item type is currently supported"
-            parser: Callable = parsers.get(item_types[0], item_types[0])
+            parser: Callable[..., Any] = parsers.get(item_types[0], item_types[0])
         else:
-            parser: Callable = parsers.get(t, t)
+            parser: Callable[..., Any] = parsers.get(t, t)
 
         try:
             parsed = parser(entry)
@@ -379,12 +380,14 @@ def parse_parameters(
 
         if not no_keywords and entry.startswith(keyword_prefix):
             if keyword_parameter is not None:
+                assert isinstance(keyword_parameter, CommandParameter)
+                print(keyword_parameter.name)
                 raise ParsingError(f"'{keyword_parameter.name}' is missing a value")
             if var_kwarg is not None:
                 raise ParsingError(f"'{var_kwarg}' is missing a value")
 
             keyword = entry[len(keyword_prefix):]
-            if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None:
+            if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None: # type: ignore
                 if keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
                     raise ParsingError("This argument is positional only")
                 elif keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
@@ -402,6 +405,7 @@ def parse_parameters(
             continue
 
         if keyword_parameter is not None:
+            assert isinstance(keyword_parameter, CommandParameter)
             if (container_type := keyword_parameter.container_type) is not None:
                 keyword_arguments[keyword_parameter.private_name] = add_to_container_type(
                     container_type,
