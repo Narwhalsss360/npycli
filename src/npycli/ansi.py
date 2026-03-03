@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections.abc import Iterable
-from typing import Optional, Any
+from typing import Optional, Any, TextIO
 from dataclasses import dataclass, field
 
 
@@ -15,15 +15,15 @@ class ANSIControl:
     instance_without_args: Optional[ANSIControl] = field(default=None)
 
     @staticmethod
-    def send(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
+    def send(ansi_control: ANSIControl | str, repeat: int = 1, flush: bool = False, file: Optional[TextIO] = None) -> None:
         if isinstance(ansi_control, ANSIControl):
             for i in range(repeat):
-                print(str(ansi_control), end="", flush=i == repeat - 1)
+                print(str(ansi_control), end="", file=file, flush=(i == repeat - 1 and flush))
         else:
             if not ansi_control.startswith(ANSIControl.CSI):
                 raise ValueError(f"Sequence {ansi_control} does not start with ANSI CSI")
             for i in range(repeat):
-                print(ansi_control, end="", flush=i == repeat - 1)
+                print(ansi_control, end="", file=file, flush=(i == repeat - 1 and flush))
 
     @property
     def has_args(self) -> bool:
@@ -54,14 +54,14 @@ class ANSIControl:
 
         return ANSIControl(self.name, sequence, self.no_of_arguments, self.no_of_default_arguments, self)
 
-    def __call__(self, *args: Any, repeat: int = 1) -> ANSIControl:
+    def __call__(self, *args: Any, repeat: int = 1, flush: bool = False, file: Optional[TextIO] = None) -> ANSIControl:
         if self.has_args:
             assert self.instance_without_args is not None
             replaced_args: ANSIControl = self.instance_without_args.with_args(*args)
-            ANSIControl.send(replaced_args, repeat)
+            ANSIControl.send(replaced_args, repeat, flush, file)
             return replaced_args
         else:
-            ANSIControl.send(self.with_args(*args), repeat)
+            ANSIControl.send(self.with_args(*args), repeat, flush, file)
             return self
 
     def __str__(self) -> str:
@@ -70,8 +70,8 @@ class ANSIControl:
         return f"{ANSIControl.CSI}{self.sequence}"
 
 
-def send_ansi(ansi_control: ANSIControl | str, repeat: int = 1) -> None:
-    ANSIControl.send(ansi_control, repeat)
+def send_ansi(ansi_control: ANSIControl | str, repeat: int = 1, flush: bool = False, file: Optional[TextIO] = None) -> None:
+    ANSIControl.send(ansi_control, repeat, flush, file)
 
 
 __controls: dict[str, ANSIControl] = {}
