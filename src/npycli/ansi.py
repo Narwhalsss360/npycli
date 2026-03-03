@@ -167,6 +167,15 @@ SHOW_CURSOR: ANSIControl = __controls["SHOW_CURSOR"]
 __controls["HIDE_CURSOR"] = ANSIControl("HIDE_CURSOR", "?25l")
 HIDE_CURSOR: ANSIControl = __controls["HIDE_CURSOR"]
 
+__controls["USE_ALTENATE_SCREEN_BUFFER"] = ANSIControl("USE_ALTERNATE_SCREEN_BUFFER", "?1049h")
+USE_ALTERNATE_SCREEN_BUFFER: ANSIControl = __controls["USE_ALTENATE_SCREEN_BUFFER"]
+
+__controls["USE_MAIN_SCREEN_BUFFER"] = ANSIControl("USE_MAIN_SCREEN_BUFFER", "?1049h")
+USE_MAIN_SCREEN_BUFFER: ANSIControl = __controls["USE_MAIN_SCREEN_BUFFER"]
+
+
+__controls["DELETE_LINE"] = ANSIControl("DELETE_LINE", "M", 1, 1)
+DELETE_LINE: ANSIControl = __controls["DELETE_LINE"]
 
 __controls["REMOVE_LINE"] = ANSIControl("REMOVE_LINE", "M")
 REMOVE_LINE: ANSIControl = __controls["REMOVE_LINE"]
