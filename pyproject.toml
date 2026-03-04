@@ -14,7 +14,7 @@ keywords = ["cli", "npy", "command line interface"]
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
-version = "0.3.0"
+version = "0.4.0"
 
 [project.urls]
 Repository = "https://github.com/Narwhalsss360/npycli"
