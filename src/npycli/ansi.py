@@ -321,7 +321,7 @@ def extract_ansi(char_iter: Iterable[str], max_iterations: int = -1) -> tuple[Op
             return None, (), -1, -1
 
         if len(c) != 1:
-            raise ValueError("Must be a character iterartor")
+            raise TypeError("Must be a character iterartor")
         s += c
         start_index += 1
         iterations += 1
