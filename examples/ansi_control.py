@@ -1,4 +1,5 @@
-from typing import Any
+from typing import Any, TextIO
+from sys import stdout
 from io import StringIO
 from os import get_terminal_size
 from npycli.ansi import (
@@ -15,10 +16,15 @@ from npycli.ansi import (
     SCR_RESET
 )
 
-def print_above(*args: Any, max_columns: int, sep: str | None = " ", current_is_empty: bool = False) -> None:
+
+def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextIO = stdout, current_is_empty: bool = False, lines_above: int = 1) -> None:
     '''
     Print above the current line.
     '''
+
+    if lines_above == 0:
+        print(*args, sep=sep)
+        return
 
     # Use print with file=buffer so this function can be used just like regular print
     buffer: StringIO = StringIO()
@@ -35,19 +41,19 @@ def print_above(*args: Any, max_columns: int, sep: str | None = " ", current_is_
 
     send_ansi(SAVE_CURRENT_CURSOR_POSITION)
     if current_is_empty:
-        print()
-        send_ansi(CURSOR_UP.with_args(2))
+        print("\n" * lines_above, file=file, end="")
+        send_ansi(CURSOR_UP.with_args(1 + lines_above), file=file)
 
     # These ansi control commands may be supplied with arguments
-    print("\n" * line_count, end="")
-    send_ansi(CURSOR_UP.with_args(line_count))
+    print("\n" * (line_count), file=file, end="")
+    send_ansi(CURSOR_UP.with_args(line_count + lines_above), file=file)
     # This one doesn't have argument, so we just repeat the command
-    send_ansi(INSERT_NEW_LINE, repeat=line_count)
+    send_ansi(INSERT_NEW_LINE, repeat=line_count, file=file)
 
     # Flush, just in case current cursor position gets moved after output
-    print(output, end='', flush=True)
-    send_ansi(RESTORE_SAVED_CURSOR_POSITION)
-    send_ansi(CURSOR_DOWN.with_args(line_count))
+    print(output, end='', file=file, flush=True)
+    send_ansi(RESTORE_SAVED_CURSOR_POSITION, file=file)
+    send_ansi(CURSOR_DOWN.with_args(line_count), file=file)
 
 
 # Prints in order
