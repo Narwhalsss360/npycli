@@ -10,7 +10,7 @@ from npycli.ansi import (
     INSERT_NEW_LINE,
     RESTORE_SAVED_CURSOR_POSITION,
     SELECT_CHARACTER_RENDITION,
-    FOREGROND_RED,
+    FOREGROUND_RED,
     BACKGROND_WHITE,
     SET_BOLD_MODE,
     SCR_RESET
@@ -63,7 +63,7 @@ print(4)
 print_above(3, max_columns=get_terminal_size().columns, current_is_empty=True) #This line will be an empty line, so current_is_empty = True
 
 
-SELECT_CHARACTER_RENDITION(SET_BOLD_MODE, FOREGROND_RED, BACKGROND_WHITE)
+SELECT_CHARACTER_RENDITION(SET_BOLD_MODE, FOREGROUND_RED, BACKGROND_WHITE)
 # Or
 print(1)
 print(2)

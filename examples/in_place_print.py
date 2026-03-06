@@ -3,7 +3,7 @@ from sys import stdout, stderr, argv
 from time import sleep
 from io import StringIO
 from typing import Callable, Generator, TextIO, Any, Literal
-from npycli.ansi import CURSOR_UP, DELETE_LINE, HIDE_CURSOR, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION, SAVE_CURRENT_CURSOR_POSITION, SCROLL_DOWN, CURSOR_DOWN, SELECT_CHARACTER_RENDITION, SCR_RESET, BACKGROND_RED, FOREGROND_WHITE, SET_BOLD_MODE
+from npycli.ansi import CURSOR_UP, DELETE_LINE, HIDE_CURSOR, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION, SAVE_CURRENT_CURSOR_POSITION, SCROLL_DOWN, CURSOR_DOWN, SELECT_CHARACTER_RENDITION, SCR_RESET, BACKGROUND_RED, FOREGROUND_WHITE, SET_BOLD_MODE
 from npycli.parsing import create_literal_parser
 from npycli import Command
 
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         pass
     except ValueError as e:
         print(
-            SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, BACKGROND_RED, FOREGROND_WHITE),
+            SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, BACKGROUND_RED, FOREGROUND_WHITE),
             "ERROR",
             SELECT_CHARACTER_RENDITION.with_args(SCR_RESET),
             f": {e}",
