@@ -3,7 +3,7 @@ from io import StringIO
 from sys import stdout
 from os import system, name, get_terminal_size
 from asyncio import run, to_thread, create_task, Task, sleep, CancelledError
-from npycli.ansi import SCR_RESET, SELECT_CHARACTER_RENDITION, SET_BOLD_MODE, send_ansi, SAVE_CURRENT_CURSOR_POSITION, CURSOR_DOWN, CURSOR_UP, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION, SHOW_CURSOR
+from npycli.ansi import SCR_RESET, SELECT_CHARACTER_RENDITION, SET_BOLD_MODE, send_ansi, SAVE_CURRENT_CURSOR_POSITION, CURSOR_DOWN, CURSOR_UP, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION, SHOW_CURSOR, strip_ansi, FOREGROUND_RED
 
 
 def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextIO = stdout, current_is_empty: bool = False, lines_above: int = 1) -> None:
@@ -22,27 +22,27 @@ def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextI
 
     line_count: int = 1
     line_length: int = 0
-    for c in output:
+    for c in strip_ansi(output):
         line_length += 1
         if line_length == max_columns or c == "\n":
             line_count += 1
             line_length = 0
 
-    send_ansi(SAVE_CURRENT_CURSOR_POSITION)
+    send_ansi(SAVE_CURRENT_CURSOR_POSITION, flush=True)
     if current_is_empty:
-        print("\n" * lines_above, file=file, end="")
-        send_ansi(CURSOR_UP.with_args(1 + lines_above), file=file)
+        print("\n" * lines_above, file=file, end="", flush=True)
+        send_ansi(CURSOR_UP.with_args(lines_above), file=file, flush=True)
 
     # These ansi control commands may be supplied with arguments
-    print("\n" * (line_count), file=file, end="")
-    send_ansi(CURSOR_UP.with_args(line_count + lines_above), file=file)
+    print("\n" * line_count, file=file, end="", flush=True)
+    send_ansi(CURSOR_UP.with_args(line_count + lines_above - (0 if current_is_empty else 1)), file=file, flush=True)
     # This one doesn't have argument, so we just repeat the command
-    send_ansi(INSERT_NEW_LINE, repeat=line_count, file=file)
+    send_ansi(INSERT_NEW_LINE, repeat=line_count, file=file, flush=True)
 
     # Flush, just in case current cursor position gets moved after output
     print(output, end='', file=file, flush=True)
-    send_ansi(RESTORE_SAVED_CURSOR_POSITION, file=file)
-    send_ansi(CURSOR_DOWN.with_args(line_count), file=file)
+    send_ansi(RESTORE_SAVED_CURSOR_POSITION, file=file, flush=True)
+    send_ansi(CURSOR_DOWN.with_args(line_count), file=file, flush=True)
 
 
 PRINT_ABOVE_INTERVAL: float = 1
@@ -68,7 +68,7 @@ async def main() -> None:
             if not input_task.done():
                 input_task.cancel()
             break
-        print_above(f"Printed Above\nIteration: {i}", max_columns=get_terminal_size().columns)
+        print_above(f"Printed Above\n{SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, FOREGROUND_RED)}Iteration: {i}{SELECT_CHARACTER_RENDITION.with_args(SCR_RESET)}", max_columns=get_terminal_size().columns)
         i += 1
 
     if input_task.done():
