@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Optional, Any, TextIO
 from dataclasses import dataclass, field
+from re import findall
 
 
 @dataclass(frozen=True)
@@ -358,3 +359,13 @@ def extract_ansi(char_iter: Iterable[str], max_iterations: int = -1) -> tuple[Op
             start_index,
             end_index + len(control.sequence)
         )
+
+
+ANSI_CONTROL_SEQUENCE_REGEX: str = r"\x1B\[([0-?]*)[\x20-/]*([@-~])"
+
+
+def strip_ansi(text: str) -> str:
+    stripped: str = text
+    for matched_groups in findall(ANSI_CONTROL_SEQUENCE_REGEX, text):
+        stripped = stripped.replace(f"{ANSIControl.CSI}{"".join(matched_groups)}", "")
+    return stripped
