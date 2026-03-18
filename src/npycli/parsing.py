@@ -64,7 +64,7 @@ def parse_args_as(positionals: list[str], keywords: dict[str, str], positional_t
             break
 
         # Args are now variable args
-        if arg_type is None or var_args_index <= index: # pyright: ignore[reportUnnecessaryComparison]
+        if arg_type is None or var_args_index <= index:  # pyright: ignore[reportUnnecessaryComparison]
             if var_args_parser is None:
                 raise TooManyArgumentsError(
                     f'Entered {len(positionals)} positionals, but max is {len(positional_types)}.')
@@ -120,9 +120,11 @@ def create_literal_parser(literal_type: TypeAliasType | UnionType) -> Callable[[
 
 def create_enum_parser[T](enum_type: Type[T]) -> Callable[[str], T]:
     assert issubclass(enum_type, Enum)
+
     def parser(s: str) -> T:
         try:
             return enum_type(s)
         except ValueError:
             return enum_type[s]
+
     return parser

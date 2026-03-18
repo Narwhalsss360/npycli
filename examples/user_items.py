@@ -5,6 +5,7 @@ from math import ceil
 import json
 from npycli import CLI, Command, CLIError, EmptyEntriesError
 from npycli.command import cmd
+from npycli.errors import causes
 from npycli.kwarg_aliasing import alias_cmd_kwargs
 from npycli.parameters import CommandParameter
 
@@ -81,7 +82,7 @@ def show_cmd(key: Optional[str] = None) -> str:
         tab_count: int = ceil(longest_length / TAB_WIDTH)
         result: str = ''
         for k, v in items().items():
-            result += f'{k: <{tab_count * TAB_WIDTH}}:{v}\n'
+            result += f'{k + ':': <{tab_count * TAB_WIDTH}}{v}\n'
         return result
     else:
         return f'{key}:{items()[key]}'
@@ -122,7 +123,7 @@ def help_cmd(
         return f"{command_name} is not a command."
 
     if parameter_name is not None:
-        if (parameter := next(filter(lambda p: parameter_name in p.names, command.parameters)), None) is None: # type: ignore
+        if (parameter := next(filter(lambda p: parameter_name in p.names, command.parameters)), None) is None:  # type: ignore
             return f"'{parameter_name}' is not a parameter"
         return parameter_help(parameter)
 
@@ -138,7 +139,8 @@ def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
 
 @cli.errors()
 def errors(command: Command, exc: Exception) -> Optional[Any]:
-    print(f'{command.name} error: {exc}')
+    errors_string: str = "\n".join([f"{' ' * TAB_WIDTH}{e.__class__.__name__}: {e}" for e in causes(exc, True)])
+    print(f'{command.name} error:\n{errors_string}')
 
 
 def as_prompter() -> None:

@@ -2,9 +2,9 @@ from __future__ import annotations
 from types import NoneType, UnionType
 from collections.abc import Callable
 from typing import Any, Annotated, Type, Union, TypeAliasType, get_origin, get_args, Literal
-from inspect import _ParameterKind, Parameter # type: ignore
+from inspect import _ParameterKind, Parameter  # type: ignore
 from dataclasses import dataclass, field
-from .errors import ParsingError
+from .errors import ParsingError, MissingKeywordArgumentValueError
 
 
 ParameterKind = _ParameterKind
@@ -67,7 +67,7 @@ class ParseHooks:
         self.err: Callable[[str, Exception], Any | Exception] | None = err
 
     def __repr__(self) -> str:
-        return f"ParseHooks(...)"
+        return "ParseHooks(...)"
 
     def __str__(self) -> str:
         return repr(self)
@@ -254,7 +254,7 @@ class CommandParameter:
     def basic_parameter_help(self) -> str:
         if (
             self.default != self.empty and
-            self.argument_types[0] == bool and
+            self.argument_types[0] is bool and
             self.kind in (ParameterKind.POSITIONAL_OR_KEYWORD, ParameterKind.KEYWORD_ONLY)
         ):
             return f"[{self.name}]"
@@ -346,7 +346,7 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
                 continue
 
             if isinstance(
-                handled := err(entry, ParsingError(f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
+                handled := err(entry, ParsingError(entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
                 Exception
             ):
                 raise handled
@@ -354,19 +354,19 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
             break
 
     if parsed is CommandParameter.UNPARSED:
-        raise ParsingError(f"Parse resolution exhausted: {entry} as {parameter.argument_types}")
+        raise ParsingError(entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}")
 
     return post(parsed)
 
 
 def add_to_container_type(container_type: Type[ContainerTypes], current: ContainerTypes | None, parsed: Any) -> ContainerTypes:
-    if container_type == list:
+    if container_type is list:
         if current is None:
             return [parsed]
         assert isinstance(current, list)
         current.append(parsed)
         return current
-    elif container_type == tuple:
+    elif container_type is tuple:
         if current is None:
             return (parsed,)
         assert isinstance(current, tuple)
@@ -400,26 +400,26 @@ def parse_parameters(
             if keyword_parameter is not None:
                 assert isinstance(keyword_parameter, CommandParameter)
                 print(keyword_parameter.name)
-                raise ParsingError(f"'{keyword_parameter.name}' is missing a value")
+                raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
             if var_kwarg is not None:
                 raise ParsingError(f"'{var_kwarg}' is missing a value")
 
             keyword = entry[len(keyword_prefix):]
-            if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None: # type: ignore
+            if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None:  # type: ignore
                 if keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
-                    raise ParsingError("This argument is positional only")
+                    raise ParsingError(keyword_parameter.name, "This argument is positional only")
                 elif keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
                     if parameters.index(keyword_parameter) < len(arguments):
-                        raise ParsingError(f"'{keyword_parameter.name}' was already specified positionally")
+                        raise ParsingError(keyword_parameter.name, f"'{keyword_parameter.name}' was already specified positionally")
 
-                if keyword_parameter.argument_types[0] == bool: # Boolean flag
+                if keyword_parameter.argument_types[0] is bool:  # Boolean flag
                     keyword_arguments[keyword_parameter.name] = True
                     keyword_parameter = None
             else:
                 if var_kwargs is not None:
                     var_kwarg = keyword
                 else:
-                    raise ParsingError(f"'{keyword}' is not a keyword parameter")
+                    raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
             continue
 
         if keyword_parameter is not None:
@@ -447,12 +447,15 @@ def parse_parameters(
             continue
 
         if len(arguments) >= len(parameters):
-            raise ParsingError(f"Too many positional arguments")
+            raise ParsingError(arguments[len(parameters)], "Too many positional arguments")
 
         parameter: CommandParameter = parameters[len(arguments)]
         if parameter.kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
-            raise ParsingError(f"Too many positional arguments")
+            raise ParsingError(arguments[len(parameters)], "Too many positional arguments")
         arguments.append(parse_with_hooks(parameter, entry, parsers))
+
+    if keyword_parameter is not None:
+        raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
 
     required_positionals: int = 0
     for i, parameter in enumerate(parameters):
