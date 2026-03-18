@@ -215,7 +215,8 @@ class Command:
                 out += " "
         out += "\n"
 
-        out += "Parameters:\n"
+        if self.parameters:
+            out += "Parameters:\n"
         for i, parameter in enumerate(self.parameters):
             out += parameter.extended_parameter_help()
             if i != len(self.parameters) - 1:
