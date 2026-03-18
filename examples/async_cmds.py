@@ -15,6 +15,11 @@ async def do_async_operation(sleeptime: Optional[float] = None) -> None:
     print("Done!")
 
 
+@cli.cmd("help")
+def help_cmd() -> str:
+    return "\n\n".join([cmd.extended_command_help() for cmd in cli.commands])
+
+
 async def cleanup():
     await asyncio.sleep(1.2)
     return "Done!"
