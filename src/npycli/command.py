@@ -98,20 +98,21 @@ class Command:
 #        positionals, keywords = extract_positionals_keywords(args, self.kwarg_prefix)
 #        args, kwargs = parse_args_as(positionals, keywords, self._positional_types, self._keyword_types,
 #                                     self._var_args_index, self._var_args_parser, parsers)
-        args, kwargs = parse_parameters(self._parameters, entries, self.kwarg_prefix, self.kwarg_prefix, parsers or {})
+
         try:
+            args, kwargs = parse_parameters(self._parameters, entries, self.kwarg_prefix, self.kwarg_prefix, parsers or {})
             return self.function(*args, **kwargs)
         except TypeError as type_error:
             if self._is_argument_error(type_error):
-                raise CommandArgumentError(*type_error.args)
-            raise type_error
+                raise CommandArgumentError(*type_error.args, command=self) from type_error
+            raise
         except ParsingError as parsing_error:
-            raise CommandArgumentError(*parsing_error.args)
+            raise CommandArgumentError(*parsing_error.args, command=self) from parsing_error
 
     def _validate_data(self) -> None:
         if not callable(self.function):
             raise TypeError(f'{Command._validate_data} -> {self.function} is not callable.')
-        if not isinstance(self.names, tuple) or not all(isinstance(name, str) for name in self.names): # type: ignore
+        if not isinstance(self.names, tuple) or not all(isinstance(name, str) for name in self.names):  # type: ignore
             raise TypeError(f'{Command} names must be a {tuple} of {str}.')
         if not self.names:
             raise ValueError(f'{Command} names must not be empty.')

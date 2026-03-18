@@ -120,7 +120,7 @@ class CLI:
         except CLIError as cli_error:
             if self._error_handler is None:
                 cli_error.cli = self
-                raise cli_error
+                raise
             return self._error_handler(command, cli_error)
         except Exception as error:
             if self._error_handler is None:
