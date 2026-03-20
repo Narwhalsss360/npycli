@@ -237,7 +237,7 @@ class CommandParameter:
         return get_origin(self._container_annotation)
 
     @property
-    def item_types(self) -> tuple[type, ...] | None:
+    def item_types(self) -> tuple[CommandParameterType, ...] | None:
         if self._container_annotation is None:
             return None
         return get_args(self._container_annotation) or (str,)
@@ -352,8 +352,9 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
     for i, t in enumerate(parameter.argument_types):
         if t in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
             assert len(item_types) == 1, "Only one item type is currently supported"
-            parser: Callable[..., Any] = parsers.get(item_types[0], item_types[0])
-        elif isinstance(t, type):
+            t = item_types[0]
+
+        if isinstance(t, type):
             parser: Callable[..., Any] = parsers.get(t, t)
         elif t in parsers:
             parser: Callable[..., Any] = parsers[t]
@@ -498,7 +499,7 @@ def parse_parameters(
     for i, parameter in enumerate(parameters):
         if parameter.kind == ParameterKind.POSITIONAL_ONLY:
             if parameter.default == parameter.empty and len(arguments) <= i:
-                raise ParsingError(f"Missing required positional '{parameter.name}'")
+                raise ParsingError(parameter.name, f"Missing required positional '{parameter.name}'")
             continue
 
         if parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
@@ -507,14 +508,14 @@ def parse_parameters(
             if len(arguments) > i:
                 continue
             if parameter.private_name not in keyword_arguments:
-                raise ParsingError(f"Missing required keyword/positional '{parameter.name}'")
+                raise ParsingError(parameter.name, f"Missing required keyword/positional '{parameter.name}'")
         if parameter.default != parameter.empty or parameter.kind in (ParameterKind.VAR_POSITIONAL, ParameterKind.VAR_KEYWORD):
             continue
 
         if parameter.private_name not in keyword_arguments:
-            raise ParsingError(f"Missing required keyword '{parameter.name}'")
+            raise ParsingError(parameter.name, f"Missing required keyword '{parameter.name}'")
 
     if len(arguments) < required_positionals:
-        raise ParsingError(f"Missing required positional '{parameters[len(arguments)].name}'")
+        raise ParsingError(parameters[len(arguments)].name, f"Missing required positional '{parameters[len(arguments)].name}'")
 
     return arguments, keyword_arguments
