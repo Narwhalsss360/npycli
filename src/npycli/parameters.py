@@ -157,7 +157,7 @@ class CommandParameter:
                 elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
                     args = get_args(annotation)
                     for arg in args:
-                        if not isinstance(arg, (type, TypeAliasType)):
+                        if not isinstance(arg, (type, TypeAliasType)) and get_origin(arg) not in CONTAINER_TYPES:
                             continue
                         next_annotation(arg, False, True)
                 elif get_origin(annotation) == Literal:
@@ -168,7 +168,13 @@ class CommandParameter:
                 else:
                     raise TypeError(f"{annotation} is unsupported")
 
-        if get_origin(annotation) == Annotated:
+        if isinstance(annotation, TypeAliasType) and get_origin(annotation.__value__) == Annotated:
+            args: tuple[type, ...] = get_args(annotation.__value__)
+            types, metadata = args[0], args[1:]
+            next_annotation(types, False)
+            for data in metadata:
+                next_annotation(data, True)
+        elif get_origin(annotation) == Annotated:
             is_metadata: bool = False
             for arg in get_args(annotation):
                 next_annotation(arg, is_metadata)
