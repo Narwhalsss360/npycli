@@ -397,7 +397,7 @@ def parse_parameters(
     keyword_parameter: CommandParameter | None = None
     var_kwarg: str | None = None
     no_keywords: bool = False
-    for entry in entries:
+    for i, entry in enumerate(entries):
         if entry == argument_seperator:
             no_keywords = True
             continue
@@ -408,7 +408,11 @@ def parse_parameters(
                 print(keyword_parameter.name)
                 raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
             if var_kwarg is not None:
-                raise ParsingError(f"'{var_kwarg}' is missing a value")
+                assert var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+                if bool in var_kwargs.argument_types:
+                    keyword_arguments[var_kwarg] = True
+                else:
+                    raise MissingKeywordArgumentValueError(f"'{var_kwarg}' is missing a value")
 
             keyword = entry[len(keyword_prefix):]
             if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None:  # type: ignore
@@ -423,7 +427,10 @@ def parse_parameters(
                     keyword_parameter = None
             else:
                 if var_kwargs is not None:
-                    var_kwarg = keyword
+                    if bool in var_kwargs.argument_types and i == len(entries) - 1:
+                        keyword_arguments[keyword] = True
+                    else:
+                        var_kwarg = keyword
                 else:
                     raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
             continue
@@ -453,7 +460,7 @@ def parse_parameters(
             continue
 
         if len(arguments) >= len(parameters):
-            raise ParsingError(arguments[len(parameters)], "Too many positional arguments")
+            raise ParsingError(arguments[len(parameters) - (1 if len(arguments) == len(parameters) else 0)], "Too many positional arguments")
 
         parameter: CommandParameter = parameters[len(arguments)]
         if parameter.kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
@@ -462,6 +469,8 @@ def parse_parameters(
 
     if keyword_parameter is not None:
         raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
+    if var_kwarg is not None:
+        raise MissingKeywordArgumentValueError(var_kwarg, f"'{var_kwarg}' is missing a value")
 
     required_positionals: int = 0
     for i, parameter in enumerate(parameters):
