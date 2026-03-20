@@ -122,10 +122,11 @@ class Command:
                     raise ValueError(f'Name for {self.function} cannot contain whitespace: {name}')
         if getattr(self.function, Command.__CMD_ATTR__, None) is not None:
             raise TypeError(f'Function {self.function} is already a {Command}.')
-        if self.help is not None and not isinstance(self.help, str): # type: ignore
+        if self.help is not None and not isinstance(self.help, str):  # type: ignore
             raise TypeError(f'{Command} help must be a {str}.')
 
     def _attach_self(self) -> None:
+        assert not hasattr(self.function, Command.__CMD_ATTR__)
         setattr(self.function, Command.__CMD_ATTR__, self)
 
     def _extract_signature(self) -> None:
@@ -230,8 +231,8 @@ class Command:
 
         return out
 
-    def __call__(self, args: list[str], parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None) -> Any:
-        return self.exec_with(args, parsers)
+    def __call__(self, args: list[str] | None = None, parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None) -> Any:
+        return self.exec_with(args or [], parsers)
 
     def __str__(self) -> str:
         return self.details
