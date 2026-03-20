@@ -90,6 +90,9 @@ ContainerTypes = (list[Any] | tuple[Any, ...])
 CONTAINER_TYPES: tuple[type, ...] = list, tuple
 
 
+type BypassParse = str
+
+
 type CommandParameterType = type | TypeAliasType
 
 
@@ -122,6 +125,7 @@ class CommandParameter:
             raise ValueError("'annotation' must not be the source code annotation string.")
         DEFAULT_NAMES: tuple[str] = ("",)
         parameter: CommandParameter = CommandParameter(DEFAULT_NAMES, kind, annotation, default=default)
+        has_bypass: bool = False
 
         def next_annotation(annotation: Any, is_metadata: bool = False, appending: bool = False) -> None:
             if is_metadata:
@@ -139,13 +143,24 @@ class CommandParameter:
                 elif isinstance(annotation, CustomAttrbute):
                     parameter.add_custom_attribute(annotation.key, annotation.value, annotation.overwrite)
             else:
+                nonlocal has_bypass
+                if has_bypass:
+                    raise TypeError(f"The only parameter must be {BypassParse.__name__} when it is specified")
                 if isinstance(annotation, type):
                     if not appending or parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
                         parameter.argument_types = (annotation,)
                     else:
                         parameter.argument_types = parameter.argument_types + (annotation,)
                 elif isinstance(annotation, TypeAliasType):
-                    if parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+                    if annotation is BypassParse:
+                        if kind != ParameterKind.VAR_POSITIONAL:
+                            raise TypeError(f"{BypassParse.__name__} parameter kind must be VAR_POSITIONAL")
+                        if default is not Parameter.empty:
+                            raise TypeError(f"{BypassParse.__name__} parameter must be empty, it will always be provided.")
+                        has_bypass = True
+                        parameter.argument_types = (BypassParse,)
+                        return
+                    elif parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
                         parameter.argument_types = (annotation,)
                     else:
                         parameter.argument_types = parameter.argument_types + (annotation,)
@@ -226,6 +241,10 @@ class CommandParameter:
         if self._container_annotation is None:
             return None
         return get_args(self._container_annotation) or (str,)
+
+    @property
+    def bypasses_parsing(self) -> bool:
+        return len(self.argument_types) == 1 and self.argument_types[0] is BypassParse
 
     def add_custom_attribute(self, key: str, value: Any, overwrite: bool = False) -> None:
         if not overwrite and key in self._custom_attributes:
@@ -393,6 +412,9 @@ def parse_parameters(
     var_args: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_POSITIONAL, parameters), None)
     var_args_index: int = -1 if var_args is None else parameters.index(var_args)
     var_kwargs: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_KEYWORD, parameters), None)
+
+    if len(parameters) == 1 and parameters[0].bypasses_parsing:
+        return entries, {}
 
     keyword_parameter: CommandParameter | None = None
     var_kwarg: str | None = None
