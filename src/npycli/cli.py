@@ -117,6 +117,8 @@ class CLI:
 
         try:
             retval: Any = command(entries, self.parsers)
+            if self._retval_handler is not None:
+                return self._retval_handler(command, retval)
         except CLIError as cli_error:
             if self._error_handler is None:
                 cli_error.cli = self
@@ -128,8 +130,6 @@ class CLI:
                                command=command) from error
             return self._error_handler(command, error)
 
-        if self._retval_handler is not None:
-            return self._retval_handler(command, retval)
         return retval
 
     def prompt(self) -> Any:
