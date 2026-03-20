@@ -24,6 +24,8 @@ def parse_kwarg_aliases(kwargs: dict[str, Any], aliases: dict[str, tuple[str, ..
             if kwarg in original_kwarg_aliases or original_kwarg == kwarg:
                 parsed_kwargs[original_kwarg] = value
                 break
+        else:
+            parsed_kwargs[kwarg] = value
     return parsed_kwargs
 
 
