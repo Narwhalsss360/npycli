@@ -166,7 +166,7 @@ class CommandParameter:
                         parameter.argument_types = parameter.argument_types + (annotation,)
                     next_annotation(annotation.__value__, False, True)
                 elif (origin := get_origin(annotation)) in CONTAINER_TYPES:
-                    assert kind == ParameterKind.KEYWORD_ONLY, f"A container argument type must be {ParameterKind.KEYWORD_ONLY}"
+                    assert kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD), f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}"
                     parameter.argument_types = (origin,)
                     parameter._container_annotation = annotation
                 elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
@@ -428,7 +428,6 @@ def parse_parameters(
         if not no_keywords and entry.startswith(keyword_prefix):
             if keyword_parameter is not None:
                 assert isinstance(keyword_parameter, CommandParameter)
-                print(keyword_parameter.name)
                 raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
             if var_kwarg is not None:
                 assert var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
@@ -446,7 +445,7 @@ def parse_parameters(
                         raise ParsingError(keyword_parameter.name, f"'{keyword_parameter.name}' was already specified positionally")
 
                 if keyword_parameter.argument_types[0] is bool:  # Boolean flag
-                    keyword_arguments[keyword_parameter.name] = True
+                    keyword_arguments[keyword_parameter.private_name] = True
                     keyword_parameter = None
             else:
                 if var_kwargs is not None:
@@ -474,7 +473,16 @@ def parse_parameters(
 
         if var_kwarg is not None:
             assert var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
-            keyword_arguments[var_kwarg] = parse_with_hooks(var_kwargs, entry, parsers)
+            if (container_type := var_kwargs.container_type) is not None:
+                if var_kwarg not in keyword_arguments:
+                    keyword_arguments[var_kwarg] = container_type()
+                keyword_arguments[var_kwarg] = add_to_container_type(
+                    container_type,
+                    keyword_arguments[var_kwarg],
+                    parse_with_hooks(var_kwargs, entry, parsers)
+                )
+            else:
+                keyword_arguments[var_kwarg] = parse_with_hooks(var_kwargs, entry, parsers)
             var_kwarg = None
             continue
 
