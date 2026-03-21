@@ -255,3 +255,11 @@ def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) 
     if not hasattr(function, Command.__CMD_HOOKS_ATTR__):
         setattr(function, Command.__CMD_HOOKS_ATTR__, [])
     getattr(function, Command.__CMD_HOOKS_ATTR__).append(callback)
+
+
+__all__ = [
+    "Command",
+    "is_cmd",
+    "cmd",
+    "cmd_hook"
+]

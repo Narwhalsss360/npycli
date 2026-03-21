@@ -139,3 +139,8 @@ class CLI:
         """
 
         return self.exec(split(input(self.prompt_entry_marker)))
+
+
+__all__ = [
+    "CLI"
+]

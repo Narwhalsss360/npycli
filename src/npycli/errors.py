@@ -51,3 +51,15 @@ def causes(exception: BaseException, include_self: bool) -> Iterator[BaseExcepti
     while exc is not None:
         yield exc
         exc = exc.__cause__
+
+
+__all__ = [
+    "ParsingError",
+    "MissingKeywordArgumentValueError",
+    "TooManyArgumentsError",
+    "CLIError",
+    "EmptyEntriesError",
+    "CommandDoesNotExistError",
+    "CommandArgumentError",
+    "causes",
+]
