@@ -1,6 +1,7 @@
 import os
 from re import match
 from npycli.ansi import ANSIControl, DEVICE_STATUS_REPORT, extract_ansi
+from time import sleep
 
 
 DEVICE_STATUS_REPORT_RE = r"\x1b\[[0-9]+;[0-9]+R"
@@ -27,10 +28,10 @@ def posix_main() -> None:
             sys.stdin.buffer.read(1)
         termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, initial_flags)
 
-    # Flush awau anything entered before this main function
+    # Flush away anything entered before this main function
     flush_keypress()
 
-    ANSIControl.send(DEVICE_STATUS_REPORT)
+    ANSIControl.send(DEVICE_STATUS_REPORT, flush=True)
     # Send ANSI right after flush, so it's the first thing
 
     initial_flags = termios.tcgetattr(sys.stdin.fileno())
@@ -41,11 +42,16 @@ def posix_main() -> None:
 
     report: str = ""
 
+    i = 0
     while True:
         c = sys.stdin.buffer.read(1).decode()
         report += c
         if c == "R":
             break
+        i += 1
+        if i == 16:
+            print("Error reading response!")
+            return
     termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, initial_flags)
 
     print(extract_position_from_report(report))
@@ -55,25 +61,25 @@ def win_main() -> None:
     assert os.name == "nt"
     import msvcrt
     def flush_keypress() -> None:
-        while True:
-            if not msvcrt.kbhit():
-                break
-
-            c = msvcrt.getch()
-            if c[0] == 0xe0:
-                c = msvcrt.getch()
-            break
+        while msvcrt.kbhit():
+            c = msvcrt.getwch()
+            if c in u'\x00\xe0':
+                msvcrt.getwch()
 
     def getch_generator(max_iterations: int = -1):
         iterations: int = 0
-        while True:
+        while msvcrt.kbhit():
             if iterations == max_iterations:
                 raise StopIteration
-            yield msvcrt.getch().decode()
+            c = msvcrt.getwch()
+            if c in u'\x00\xe0':
+                c = msvcrt.getwch()
+            yield c
             iterations += 1
 
     flush_keypress()
-    ANSIControl.send(DEVICE_STATUS_REPORT)
+    ANSIControl.send(DEVICE_STATUS_REPORT, flush=True)
+    sleep(0.0005)
     control, args, start_index, end_index = extract_ansi(getch_generator(16))
     if control is None:
         print("Error reading response!")
