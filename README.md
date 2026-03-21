@@ -19,3 +19,4 @@ See more [documentation](./docs).
 
 * [Simple single command program that sums numbers](./examples/summation.py)
 * [Multiple command program that uses a `dict` to manage user key-value pairs](./examples/user_items.py)
+- _And more..._

@@ -38,6 +38,5 @@ def errors(command: Command, exception: Exception) -> None:
     print(f'A {exception.__class__.__name__} error occurred executing {command.name}:\n{exception}')
 ```
 
-***Note:** the `@cli.errors()` handler will not be called if an exception is thrown by `cli.prompt()` or `cli.exec()`,
-only
-if the exception is raised while **executing** the command.*
+***Note:** the `@cli.errors()` handler will not be called if an exception is thrown by `cli.prompt()` or `cli.exec()`, Optional
+if the exception is raised while **executing** the command or the `retvals`.*

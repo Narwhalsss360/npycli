@@ -2,6 +2,9 @@
 
 ## Keyword argument aliases
 
+> [!NOTE]
+> If using `Annotated`, use the `Alias` type.
+
 the `kwarg_aliasing` module provides a function decorator to give aliases to arguments.  
 There is one for regular functions: `alias_kwargs`, and one for functions that would be a `Command`:
 `alias_cmd_kargs`.
