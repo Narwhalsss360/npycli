@@ -61,3 +61,12 @@ def alias_cmd_kwargs(aliases: dict[str, tuple[str, ...]]) -> Callable[[Callable[
         return wrapper
 
     return decorator
+
+
+__all__ = [
+    "attach_kwarg_aliases",
+    "get_kwarg_aliases",
+    "parse_kwarg_aliases",
+    "alias_kwargs",
+    "alias_cmd_kwargs",
+]
