@@ -6,7 +6,7 @@ from npycli.parameters import Alias, Description
 
 def http_headers(
     *,
-    headers: Annotated[Optional[tuple[str]], Description("Specify this keyword argument multiple times"), Alias("header", private=True)] = None
+    headers: Annotated[Optional[tuple[str, ...]], Description("Specify this keyword argument multiple times"), Alias("header", private=True)] = None
 ):
     for header in headers or tuple():
         print(f"{header}\\r\\n")

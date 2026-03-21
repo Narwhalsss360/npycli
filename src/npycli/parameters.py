@@ -169,6 +169,11 @@ class CommandParameter:
                     assert kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD), f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}"
                     parameter.argument_types = (origin,)
                     parameter._container_annotation = annotation
+                    item_types: tuple[CommandParameterType, ...] | None = parameter.item_types
+                    assert item_types is not None, "Shall not be None of _container_annotation is not None"
+
+                    if not all(isinstance(item_type, (type, TypeAliasType)) for item_type in item_types):
+                        raise TypeError(f"{item_types} is not supported as item types for containers, only {CommandParameterType}.")
                 elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
                     args = get_args(annotation)
                     for arg in args:
@@ -240,7 +245,19 @@ class CommandParameter:
     def item_types(self) -> tuple[CommandParameterType, ...] | None:
         if self._container_annotation is None:
             return None
-        return get_args(self._container_annotation) or (str,)
+        if (args := get_args(self._container_annotation)) is None:
+            return (str, )
+
+        if get_origin(self._container_annotation) is tuple:
+            if len(args) != 2 or args[1] is not Ellipsis:
+                raise TypeError("Ellipsis required for second generic argument of tuples")
+            args = (args[0],)
+        elif len(args) != 1:
+            raise TypeError("Only single argument generic container types are supported")
+
+        if isinstance(args[0], Union):
+            return get_args(args[0])
+        return args
 
     @property
     def bypasses_parsing(self) -> bool:
@@ -349,34 +366,39 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
 
     parsed: Any = CommandParameter.UNPARSED
     entry = pre(entry)
-    for i, t in enumerate(parameter.argument_types):
-        if t in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
-            assert len(item_types) == 1, "Only one item type is currently supported"
-            t = item_types[0]
-
-        if isinstance(t, type):
-            parser: Callable[..., Any] = parsers.get(t, t)
-        elif t in parsers:
-            parser: Callable[..., Any] = parsers[t]
+    for ith_type, parameter_type in enumerate(parameter.argument_types):
+        if parameter_type in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
+            inner_types: tuple[CommandParameterType, ...] = item_types
         else:
-            continue
+            inner_types: tuple[CommandParameterType, ...] = (parameter_type,)
 
-        try:
-            parsed = parser(entry)
-            break
-        except Exception as exc:
-            if not isinstance(handled := err(entry, exc), Exception):
-                parsed = handled
-                break
-            if i != len(parameter.argument_types) - 1:
+        for ith_inner_type, inner_type in enumerate(inner_types):
+            if isinstance(inner_type, type):
+                parser: Callable[..., Any] = parsers.get(inner_type, inner_type)
+            elif inner_type in parsers:
+                parser: Callable[..., Any] = parsers[inner_type]
+            else:
                 continue
 
-            if isinstance(
-                handled := err(entry, ParsingError(entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
-                Exception
-            ):
-                raise handled
-            parsed = handled
+            try:
+                parsed = parser(entry)
+                break
+            except Exception as exc:
+                if not isinstance(handled := err(entry, exc), Exception):
+                    parsed = handled
+                    break
+                if ith_type != len(parameter.argument_types) - 1 or ith_inner_type != len(inner_types) - 1:
+                    continue
+
+                if isinstance(
+                    handled := err(entry, ParsingError(entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
+                    Exception
+                ):
+                    raise handled
+                parsed = handled
+                break
+
+        if parsed is not CommandParameter.UNPARSED:
             break
 
     if parsed is CommandParameter.UNPARSED:
