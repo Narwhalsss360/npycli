@@ -43,3 +43,4 @@ if __name__ == "__main__":
         DecodedJSON: loads,
         UserType: create_literal_parser(UserType)
     })
+

@@ -159,4 +159,7 @@ def main(
 
 
 if __name__ == "__main__":
-    Command.create(main).exec_with(argv[1:])
+    try:
+        Command.create(main).exec_with(argv[1:])
+    except KeyboardInterrupt:
+        print("\n^C")

@@ -121,92 +121,7 @@ class CommandParameter:
 
     @staticmethod
     def build(name: str, kind: ParameterKind, annotation: Any, default: Any = empty) -> CommandParameter:
-        if isinstance(annotation, str):
-            raise ValueError("'annotation' must not be the source code annotation string.")
-        DEFAULT_NAMES: tuple[str] = ("",)
-        parameter: CommandParameter = CommandParameter(DEFAULT_NAMES, kind, annotation, default=default)
-        has_bypass: bool = False
-
-        def next_annotation(annotation: Any, is_metadata: bool = False, appending: bool = False) -> None:
-            if is_metadata:
-                if isinstance(annotation, Alias):
-                    parameter.names = (() if annotation.private else (name,)) + annotation.aliases
-                    parameter._private_name = name
-                elif isinstance(annotation, Description):
-                    parameter.description = annotation.description
-                elif isinstance(annotation, AnnotationPreview):
-                    parameter.annotation_preview = annotation.annotation_preview
-                elif isinstance(annotation, DefaultPreview):
-                    parameter.default_preview = annotation.default_preview
-                elif isinstance(annotation, ParseHooks):
-                    parameter.parse_hooks = annotation
-                elif isinstance(annotation, CustomAttrbute):
-                    parameter.add_custom_attribute(annotation.key, annotation.value, annotation.overwrite)
-            else:
-                nonlocal has_bypass
-                if has_bypass:
-                    raise TypeError(f"The only parameter must be {BypassParse.__name__} when it is specified")
-                if isinstance(annotation, type):
-                    if not appending or parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
-                        parameter.argument_types = (annotation,)
-                    else:
-                        parameter.argument_types = parameter.argument_types + (annotation,)
-                elif isinstance(annotation, TypeAliasType):
-                    if annotation is BypassParse:
-                        if kind != ParameterKind.VAR_POSITIONAL:
-                            raise TypeError(f"{BypassParse.__name__} parameter kind must be VAR_POSITIONAL")
-                        if default is not Parameter.empty:
-                            raise TypeError(f"{BypassParse.__name__} parameter must be empty, it will always be provided.")
-                        has_bypass = True
-                        parameter.argument_types = (BypassParse,)
-                        return
-                    elif parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
-                        parameter.argument_types = (annotation,)
-                    else:
-                        parameter.argument_types = parameter.argument_types + (annotation,)
-                    next_annotation(annotation.__value__, False, True)
-                elif (origin := get_origin(annotation)) in CONTAINER_TYPES:
-                    assert kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD), f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}"
-                    parameter.argument_types = (origin,)
-                    parameter._container_annotation = annotation
-                    item_types: tuple[CommandParameterType, ...] | None = parameter.item_types
-                    assert item_types is not None, "Shall not be None of _container_annotation is not None"
-
-                    if not all(isinstance(item_type, (type, TypeAliasType)) for item_type in item_types):
-                        raise TypeError(f"{item_types} is not supported as item types for containers, only {CommandParameterType}.")
-                elif isinstance(annotation, UnionType) or get_origin(annotation) == Union:
-                    args = get_args(annotation)
-                    for arg in args:
-                        if not isinstance(arg, (type, TypeAliasType)) and get_origin(arg) not in CONTAINER_TYPES:
-                            continue
-                        next_annotation(arg, False, True)
-                elif get_origin(annotation) == Literal:
-                    if not appending or parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
-                        parameter.argument_types = (annotation,)
-                    else:
-                        parameter.argument_types = parameter.argument_types + (annotation,)
-                else:
-                    raise TypeError(f"{annotation} is unsupported")
-
-        if isinstance(annotation, TypeAliasType) and get_origin(annotation.__value__) == Annotated:
-            args: tuple[type, ...] = get_args(annotation.__value__)
-            types, metadata = args[0], args[1:]
-            next_annotation(types, False)
-            for data in metadata:
-                next_annotation(data, True)
-        elif get_origin(annotation) == Annotated:
-            is_metadata: bool = False
-            for arg in get_args(annotation):
-                next_annotation(arg, is_metadata)
-                is_metadata = True
-        else:
-            next_annotation(annotation)
-
-        if parameter.names is DEFAULT_NAMES:
-            parameter.names = (name,)
-
-        parameter._validate_data()
-        return parameter
+        return CommandParameterBuilder(name, kind, annotation, default).parameter
 
     @property
     def name(self) -> str:
@@ -353,6 +268,127 @@ class CommandParameter:
     def _validate_data(self) -> None:
         assert len(self.names), "Parameters must have at least 1 name"
         assert len(self.argument_types), "Parameters must have at least 1 type"
+
+
+class CommandParameterBuilder:
+    DEFAULT_NAMES: tuple[str] = ("",)
+
+    def __init__(self, name: str, kind: ParameterKind, annotation: Any, default: Any = CommandParameter.empty) -> None:
+        if isinstance(annotation, str):
+            raise ValueError("'annotation' must not be the source code annotation string.")
+
+        self._name: str = name
+        self._kind: ParameterKind = kind
+        self._default: Any = default
+        self._parameter: CommandParameter = CommandParameter(CommandParameterBuilder.DEFAULT_NAMES, kind, annotation, default=default)
+        self._has_bypass: bool = False
+        self._appending_mode: bool = False
+        self._built: bool = False
+
+        if isinstance(annotation, TypeAliasType) and get_origin(annotation.__value__) is Annotated:
+            args: tuple[Any, ...] = get_args(annotation.__value__)
+            self._next_annotation(args[0])
+            for arg in args[1:]:
+                self._next_metadata_annotation(arg)
+        elif get_origin(annotation) is Annotated:
+            args: tuple[Any, ...] = get_args(annotation)
+            self._next_annotation(args[0])
+            for arg in args[1:]:
+                self._next_metadata_annotation(arg)
+        else:
+            self._next_annotation(annotation)
+
+    def _next_metadata_annotation(self, annotation: Any) -> None:
+        if isinstance(annotation, Alias):
+            self._parameter.names = (() if annotation.private else (self._name,)) + annotation.aliases
+            self._parameter._private_name = self._name
+        elif isinstance(annotation, Description):
+            self._parameter.description = annotation.description
+        elif isinstance(annotation, AnnotationPreview):
+            self._parameter.annotation_preview = annotation.annotation_preview
+        elif isinstance(annotation, DefaultPreview):
+            self._parameter.default_preview = annotation.default_preview
+        elif isinstance(annotation, ParseHooks):
+            self._parameter.parse_hooks = annotation
+        elif isinstance(annotation, CustomAttrbute):
+            self._parameter.add_custom_attribute(annotation.key, annotation.value, annotation.overwrite)
+        else:
+            raise TypeError(f"{annotation} is unsupported")
+
+    def _next_annotation(self, annotation: Any) -> None:
+        if self._has_bypass:
+            raise TypeError(f"The only self._parameter.must be {BypassParse.__name__} when it is specified")
+
+        if isinstance(annotation, type):
+            if not self._appending_mode or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+                self._parameter.argument_types = (annotation,)
+            else:
+                self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+            return
+
+        if isinstance(annotation, TypeAliasType):
+            self._next_type_alias(annotation)
+            return
+
+        if (origin := get_origin(annotation)) in CONTAINER_TYPES:
+            if self._kind not in (self._parameter.kind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
+                raise TypeError(f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}")
+            self._parameter.argument_types = (origin,)
+            self._parameter._container_annotation = annotation
+            item_types: tuple[CommandParameterType, ...] | None = self._parameter.item_types
+            assert item_types is not None, "Shall not be None of _container_annotation is not None"
+
+            if not all(isinstance(item_type, (type, TypeAliasType)) for item_type in item_types):
+                raise TypeError(f"{item_types} is not supported as item types for containers, only {CommandParameterType}.")
+            return
+
+        if isinstance(annotation, UnionType) or get_origin(annotation) == Union:
+            args = get_args(annotation)
+            for arg in args:
+                if not isinstance(arg, (type, TypeAliasType)) and get_origin(arg) not in CONTAINER_TYPES:
+                    continue
+                self._appending_mode = True
+                self._next_annotation(arg)
+            return
+
+        if get_origin(annotation) == Literal:
+            if not self._appending_mode or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+                self._parameter.argument_types = (annotation,)
+            else:
+                self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+            return
+
+        raise TypeError(f"{annotation} is unsupported")
+
+    def _next_type_alias(self, annotation: TypeAliasType) -> None:
+        if annotation is BypassParse:
+            if self._kind != self._parameter.kind.VAR_POSITIONAL:
+                raise TypeError(f"{BypassParse.__name__} self._parameter.kind must be VAR_POSITIONAL")
+            if self._default is not self._parameter.empty:
+                raise TypeError(f"{BypassParse.__name__} self._parameter.must be empty, it will always be provided.")
+            self._has_bypass = True
+            self._parameter.argument_types = (BypassParse,)
+            return
+
+        if self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+            self._parameter.argument_types = (annotation,)
+        else:
+            self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+
+        self._appending_mode = True
+        self._next_annotation(annotation.__value__)
+
+    @property
+    def parameter(self) -> CommandParameter:
+        if self._built:
+            return self._parameter
+
+        self._built = True
+        if self._parameter.names is CommandParameterBuilder.DEFAULT_NAMES:
+            self._parameter.names = (self._name,)
+
+        self._parameter._validate_data()
+        return self._parameter
 
 
 def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[CommandParameterType, Callable[[str], Any]]) -> Any:
