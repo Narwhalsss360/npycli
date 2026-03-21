@@ -5,7 +5,7 @@ from pathlib import Path
 from sys import argv
 from io import StringIO
 from npycli import Command
-from npycli.ansi import CURSOR_UP, SELECT_CHARACTER_RENDITION, SCR_RESET, SET_UNDERLINE_MODE, SET_BLINKING_MODE, strip_ansi, HIDE_CURSOR
+from npycli.ansi import CURSOR_UP, SELECT_CHARACTER_RENDITION, SCR_RESET, SET_UNDERLINE_MODE, SET_BLINKING_MODE, INSERT_NEW_LINE, HIDE_CURSOR, SHOW_CURSOR, strip_ansi
 
 
 class InPlacePrint:
@@ -16,7 +16,7 @@ class InPlacePrint:
     def wrap(string: str, columns: int) -> list[str]:
         lines: list[str] = string.split("\n")
         for i in range(len(lines)):
-            if len(lines[i]) > columns:
+            if len(strip_ansi(lines[i])) > columns:
                 this, next = lines[i][:columns], lines[i][columns:]
                 lines[i] = this
                 lines.insert(i + 1, next)
@@ -56,6 +56,19 @@ class InPlacePrint:
         CURSOR_UP(len(with_clearing))
         return True
 
+    def print_above(self, *values: Any, sep: str = " ", end: str = "") -> None:
+        buffer: StringIO = StringIO()
+        print(*values, sep=sep, end=end, file=buffer, flush=True)
+        terminal_size = get_terminal_size()
+        lines: list[str] = InPlacePrint.wrap(buffer.getvalue(), terminal_size.columns)
+
+        if not self.last_lines:
+            print("\n".join(lines))
+            return
+
+        INSERT_NEW_LINE(repeat=len(lines))
+        print("\n".join(lines))
+
     def clear(self) -> bool:
         if self.last_lines is None:
             return True
@@ -69,8 +82,8 @@ class InPlacePrint:
         CURSOR_UP(len(self.last_lines))
         return True
 
-    def __call__(self, string: str) -> bool:
-        return self.print(string)
+    def __call__(self, *values: Any, sep: str = " ", end: str = "\n") -> bool:
+        return self.print(*values, sep=sep, end=end)
 
 
 def line_count_wrapped_at(s: str, column: int) -> int:
@@ -126,21 +139,24 @@ def main(
     )
 
     HIDE_CURSOR()
-    in_place = InPlacePrint()
-    for root, _, files in working_directory.walk():
-        for file in files:
-            if not in_place(make_tree_string(working_directory, root.joinpath(file))):
-                print(chr(0x2500) * get_terminal_size().columns)
-            sleep(interval)
+    try:
+        in_place = InPlacePrint()
+        for root, _, files in working_directory.walk():
+            for file in files:
+                if not in_place(make_tree_string(working_directory, root.joinpath(file))):
+                    print(chr(0x2500) * get_terminal_size().columns)
+                sleep(interval)
 
-    if in_place.clear():
-        CURSOR_UP()
-        print(" " * get_terminal_size().columns, end="\r")
-    print("Done!")
+        if in_place.clear():
+            CURSOR_UP()
+            print(" " * get_terminal_size().columns, end="\r")
+        print("Done!")
+    except Exception:
+        SHOW_CURSOR()
+        raise
+    finally:
+        SHOW_CURSOR()
 
 
 if __name__ == "__main__":
-    try:
-        Command.create(main).exec_with(argv[1:])
-    except KeyboardInterrupt:
-        print("\n^C")
+    Command.create(main).exec_with(argv[1:])

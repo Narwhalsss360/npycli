@@ -1,11 +1,12 @@
 from os import get_terminal_size
-from sys import stdout, stderr, argv
+from sys import stderr, argv
 from time import sleep
 from io import StringIO
-from typing import Callable, Generator, TextIO, Any, Literal
-from npycli.ansi import CURSOR_UP, DELETE_LINE, HIDE_CURSOR, INSERT_NEW_LINE, RESTORE_SAVED_CURSOR_POSITION, SAVE_CURRENT_CURSOR_POSITION, SCROLL_DOWN, CURSOR_DOWN, SELECT_CHARACTER_RENDITION, SCR_RESET, BACKGROUND_RED, FOREGROUND_WHITE, SET_BOLD_MODE
+from typing import Callable, Generator, Any, Literal
+from npycli.ansi import CURSOR_UP, HIDE_CURSOR, INSERT_NEW_LINE, SELECT_CHARACTER_RENDITION, SCR_RESET, BACKGROUND_RED, FOREGROUND_WHITE, SET_BOLD_MODE, strip_ansi, SHOW_CURSOR
 from npycli.parsing import create_literal_parser
 from npycli import Command
+import builtins
 
 
 def wrap_and_pad_lines(string: str, columns: int) -> str:
@@ -25,74 +26,81 @@ type terminal_size_getter_type = Callable[[], tuple[terminal_columns_type, termi
 
 
 class InPlacePrint:
-    def __init__(self, terminal_size_getter: terminal_size_getter_type = get_terminal_size, file: TextIO = stdout) -> None:
-        self.last_string: str | None = None
-        self.terminal_size_getter: terminal_size_getter_type = terminal_size_getter
-        self.file: TextIO = file
+    def __init__(self) -> None:
+        self.last_lines: list[str] | None = None
 
-    def print(self, *values: Any, sep: str = " ", end: str = "\n", raise_on_too_short: bool = True) -> None:
+    @staticmethod
+    def wrap(string: str, columns: int) -> list[str]:
+        lines: list[str] = string.split("\n")
+        for i in range(len(lines)):
+            if len(strip_ansi(lines[i])) > columns:
+                this, next = lines[i][:columns], lines[i][columns:]
+                lines[i] = this
+                lines.insert(i + 1, next)
+        return lines
+
+    @staticmethod
+    def pad(lines: list[str], padding: list[int]) -> list[str]:
+        if len(lines) != len(padding):
+            raise ValueError("'lines' and 'padding' must be the same size.")
+        return [line.ljust(pad) for line, pad in zip(lines, padding)]
+
+    def print(self, *values: Any, sep: str = " ", end: str = "\n") -> bool:
         buffer: StringIO = StringIO()
         print(*values, sep=sep, end=end, file=buffer, flush=True)
-        string: str = wrap_and_pad_lines(buffer.getvalue(), self.terminal_size_getter()[0])
+        terminal_size = get_terminal_size()
+        lines: list[str] = InPlacePrint.wrap(buffer.getvalue(), terminal_size.columns)
+        with_clearing: list[str] = lines.copy()
 
-        line_count: int = string.count('\n') + 1
-        lines: int = self.terminal_size_getter()[1]
-        if lines < line_count:
-            if raise_on_too_short:
-                raise ValueError("Not enough lines to print in place.")
-            print(string, file=self.file, end="")
-            self.last_string = None
-            return
+        if self.last_lines is not None:
+            if len(self.last_lines) > len(lines):
+                clearing_line: str = " " * terminal_size.columns
+                with_clearing.extend(clearing_line for _ in range(len(self.last_lines) - len(lines)))
 
-        if self.last_string is None:
-            self.last_string = string
-            if line_count > 1:
-                SCROLL_DOWN(line_count - 1)
-                INSERT_NEW_LINE(repeat=line_count - 1)
-                CURSOR_UP(line_count - 1)
-            print(string, file=self.file, end="")
-            return
+            padding: list[int] = [len(last_line) for last_line in self.last_lines]
+            if len(padding) < len(with_clearing):
+                padding.extend(0 for _ in range(len(lines) - len(padding)))
+            with_clearing = InPlacePrint.pad(with_clearing, padding)
 
-        repeats: int = self.last_string.count("\n") + 1
-        for i in range(repeats):
-            DELETE_LINE(file=self.file)
-            if i != repeats - 1:
-                CURSOR_UP(file=self.file)
-        INSERT_NEW_LINE(repeat=line_count)
-        print(string, file=self.file, end="")
+        self.last_lines = lines
+        print("\n".join(with_clearing))
+        if len(with_clearing) >= terminal_size.lines:
+            self.last_lines = None
+            if len(with_clearing) > len(lines):
+                CURSOR_UP(len(with_clearing) - len(lines))
+            return False
 
-        self.last_string = string
+        CURSOR_UP(len(with_clearing))
+        return True
 
-    def print_above(self, *args: Any, sep: str | None = " ") -> None:
+    def print_above(self, *values: Any, sep: str = " ", end: str = "") -> None:
         buffer: StringIO = StringIO()
-        print(*args, sep=sep, end="", file=buffer, flush=True)
-        output: str = buffer.getvalue()
+        print(*values, sep=sep, end=end, file=buffer, flush=True)
+        terminal_size = get_terminal_size()
+        lines: list[str] = InPlacePrint.wrap(buffer.getvalue(), terminal_size.columns)
 
-        line_count: int = 1
-        line_length: int = 0
-        max_columns: int = self.terminal_size_getter()[0]
-        for c in output:
-            line_length += 1
-            if line_length == max_columns or c == "\n":
-                line_count += 1
-                line_length = 0
-
-        SAVE_CURRENT_CURSOR_POSITION()
-        if self.last_string is None:
-            print(output, flush=True, file=self.file)
+        if not self.last_lines:
+            print("\n".join(lines))
             return
 
-        last_string_line_count_offset: int = self.last_string.count("\n") if self.last_string else 0
-        print("\n" * line_count, end="", file=self.file)
-        CURSOR_UP(line_count + last_string_line_count_offset)
-        INSERT_NEW_LINE(repeat=line_count)
+        INSERT_NEW_LINE(repeat=len(lines))
+        print("\n".join(lines))
 
-        print(output, end='', flush=True, file=self.file)
-        RESTORE_SAVED_CURSOR_POSITION()
-        CURSOR_DOWN(line_count)
+    def clear(self) -> bool:
+        if self.last_lines is None:
+            return True
+        terminal_size = get_terminal_size()
+        if len(self.last_lines) >= terminal_size.lines:
+            self.last_lines = None
+            return False
 
-    def __call__(self, *values: Any, sep: str = " ", end: str = "\n", raise_on_too_short: bool = True) -> None:
-        self.print(*values, sep=sep, end=end, raise_on_too_short=raise_on_too_short)
+        clearing_line: str = " " * terminal_size.columns
+        print("\n".join([clearing_line for _ in range(len(self.last_lines))]))
+        CURSOR_UP(len(self.last_lines))
+        return True
+
+    def __call__(self, *values: Any, sep: str = " ", end: str = "\n") -> bool:
+        return self.print(*values, sep=sep, end=end)
 
 
 def bouncer(min: int, max: int, increasing: bool, max_iterations: int) -> Generator[int, Any, None]:
@@ -136,24 +144,34 @@ def main(
     if max < min:
         raise ValueError("Must not have max < min")
 
-    HIDE_CURSOR()
     bounces: int = -1
-    bounce_message: str = f""
-    for n in bouncer(min, max, direction == "increasing", max_iterations):
-        if bounce_object == "numbers":
-            s: str = f"{"\u2500" * len(bounce_message)}\n{"\n".join(str(i + bounces) for i in range(n))}"
-        else:
-            s: str = (
-                f"{"\u2500" * len(bounce_message)}\n"
-                f"{"\n" * (max - n)}{" " * (len(bounce_message) // 2)}*{n * "\n"}"
-                f"\n{"\u2500" * len(bounce_message)}"
-            )
-        in_place_print(s, end="")
-        if n == min:
-            bounces += 1
-            bounce_message: str = f"Bounce: {bounces}"
-            in_place_print.print_above(bounce_message)
-        sleep(sleep_interval)
+    bounce_message: str = ""
+    HIDE_CURSOR()
+    try:
+        for n in bouncer(min, max, direction == "increasing", max_iterations):
+            bounce_message_lines: list[str] = [strip_ansi(line) for line in bounce_message.splitlines()]
+            separator_width: int = len("  Bounce: 1") if len(bounce_message) == 0 else builtins.max(len(line) for line in bounce_message_lines)
+            if bounce_object == "numbers":
+                s: str = f"{"\u2500" * separator_width}\n{"\n".join(str(i + bounces) for i in range(n))}"
+            else:
+                s: str = (
+                    f"{"\u2500" * separator_width}\n"
+                    f"{"\n" * (max - n)}{" " * (separator_width // 2)}*{n * "\n"}"
+                    f"\n{"\u2500" * separator_width}"
+                )
+            in_place_print(s, end="")
+            if n == min:
+                bounces += 1
+                bounce_message: str = f"Next:\n  Bounce: {bounces}"
+                in_place_print.print_above(bounce_message)
+            sleep(sleep_interval)
+    except KeyboardInterrupt:
+        in_place_print.clear()
+    except Exception:
+        SHOW_CURSOR()
+        raise
+    finally:
+        SHOW_CURSOR()
 
 
 if __name__ == "__main__":
@@ -162,8 +180,6 @@ if __name__ == "__main__":
             Direction: create_literal_parser(Direction),
             BounceObject: create_literal_parser(BounceObject)
         })
-    except KeyboardInterrupt:
-        pass
     except ValueError as e:
         print(
             SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, BACKGROUND_RED, FOREGROUND_WHITE),
