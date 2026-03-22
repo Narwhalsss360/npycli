@@ -170,7 +170,7 @@ class CommandParameter:
         elif len(args) != 1:
             raise TypeError("Only single argument generic container types are supported")
 
-        if isinstance(args[0], Union):
+        if isinstance(args[0], UnionType) or args[0] == Union:
             return get_args(args[0])
         return args
 
