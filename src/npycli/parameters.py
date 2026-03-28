@@ -1,5 +1,5 @@
 from __future__ import annotations
-from types import NoneType, UnionType
+from types import NoneType, UnionType, GenericAlias
 from collections.abc import Callable
 from typing import Any, Annotated, Type, Union, TypeAliasType, get_origin, get_args, Literal
 from inspect import _ParameterKind, Parameter  # type: ignore
@@ -93,7 +93,7 @@ CONTAINER_TYPES: tuple[type, ...] = list, tuple
 type BypassParse = str
 
 
-type CommandParameterType = type | TypeAliasType
+type CommandParameterType = type | TypeAliasType | GenericAlias
 
 
 @dataclass
@@ -160,7 +160,7 @@ class CommandParameter:
     def item_types(self) -> tuple[CommandParameterType, ...] | None:
         if self._container_annotation is None:
             return None
-        if (args := get_args(self._container_annotation)) is None:
+        if not (args := get_args(self._container_annotation)):
             return (str, )
 
         if get_origin(self._container_annotation) is tuple:
@@ -301,7 +301,7 @@ class CommandParameterBuilder:
     def _next_metadata_annotation(self, annotation: Any) -> None:
         if isinstance(annotation, Alias):
             self._parameter.names = (() if annotation.private else (self._name,)) + annotation.aliases
-            self._parameter._private_name = self._name
+            self._parameter._private_name = self._name  # pyright: ignore [reportPrivateUsage]
         elif isinstance(annotation, Description):
             self._parameter.description = annotation.description
         elif isinstance(annotation, AnnotationPreview):
@@ -334,12 +334,16 @@ class CommandParameterBuilder:
             if self._kind not in (self._parameter.kind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
                 raise TypeError(f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}")
             self._parameter.argument_types = (origin,)
-            self._parameter._container_annotation = annotation
+            self._parameter._container_annotation = annotation  # pyright: ignore [reportPrivateUsage]
             item_types: tuple[CommandParameterType, ...] | None = self._parameter.item_types
             assert item_types is not None, "Shall not be None of _container_annotation is not None"
 
             if not all(isinstance(item_type, (type, TypeAliasType)) for item_type in item_types):
                 raise TypeError(f"{item_types} is not supported as item types for containers, only {CommandParameterType}.")
+            return
+
+        if isinstance(annotation, GenericAlias):
+            self._next_generic_alias(annotation)
             return
 
         if isinstance(annotation, UnionType) or get_origin(annotation) == Union:
@@ -378,6 +382,12 @@ class CommandParameterBuilder:
         self._appending_mode = True
         self._next_annotation(annotation.__value__)
 
+    def _next_generic_alias(self, annotation: GenericAlias) -> None:
+        if self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+            self._parameter.argument_types = (annotation,)
+        else:
+            self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+
     @property
     def parameter(self) -> CommandParameter:
         if self._built:
@@ -387,7 +397,7 @@ class CommandParameterBuilder:
         if self._parameter.names is CommandParameterBuilder.DEFAULT_NAMES:
             self._parameter.names = (self._name,)
 
-        self._parameter._validate_data()
+        self._parameter._validate_data()  # pyright: ignore [reportPrivateUsage]
         return self._parameter
 
 
@@ -523,10 +533,14 @@ def parse_parameters(
                     keyword_arguments.get(keyword_parameter.private_name, None),
                     parse_with_hooks(keyword_parameter, entry, parsers)
                 )
-                keyword_parameter = None
+            elif keyword_parameter.kind == ParameterKind.VAR_POSITIONAL:
+                if len(arguments) <= var_args_index:
+                    raise ParsingError(entry, "Cannot provide variable positional argument before positional-only and positional-or-keyword parameters.")
+                arguments.append(parse_with_hooks(keyword_parameter, entry, parsers))
             else:
                 keyword_arguments[keyword_parameter.private_name] = parse_with_hooks(keyword_parameter, entry, parsers)
-                keyword_parameter = None
+
+            keyword_parameter = None
             continue
 
         if var_kwarg is not None:
