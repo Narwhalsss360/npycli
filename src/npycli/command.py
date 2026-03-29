@@ -127,7 +127,10 @@ class Command:
 
     def _attach_self(self) -> None:
         assert not hasattr(self.function, Command.__CMD_ATTR__)
-        setattr(self.function, Command.__CMD_ATTR__, self)
+        try:
+            setattr(self.function, Command.__CMD_ATTR__, self)
+        except AttributeError:
+            pass
 
     def _extract_signature(self) -> None:
         self._signature: Signature = signature(self.function)
@@ -148,7 +151,7 @@ class Command:
                 CommandParameter.build(
                     parameter.name,
                     parameter.kind,
-                    annotations[parameter.name],
+                    annotations.get(parameter.name, str),
                     default=parameter.default
                 )
             )
