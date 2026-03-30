@@ -1,9 +1,9 @@
 from sys import argv, stdout, stderr
 from dataclasses import asdict
-from asyncio import AbstractEventLoop, get_event_loop, run
+from asyncio import AbstractEventLoop, get_event_loop, run, create_task
 from json import loads, dumps
 from socket import socket, AddressFamily, SocketKind, IPPROTO_TCP
-from user_items_remote_server import REMOTE_PORT, NEWLINE_DELIMITER, Output, OutputDirection, UserInput, RemoteInitialization, UserInputRequest, recv_line
+from user_items_remote_server import REMOTE_PORT, NEWLINE_DELIMITER, Output, OutputDirection, UserInput, RemoteInitialization, UserInputRequest, recv_line, throw_on_timeout, STEP_TIMEOUT
 
 
 async def main() -> int:
@@ -18,7 +18,10 @@ async def main() -> int:
         ))).encode() + NEWLINE_DELIMITER)
 
         try:
-            user_input_request_json: str = (await recv_line(client)).decode()
+            user_input_request_json: str = (await throw_on_timeout(
+                    create_task(recv_line(client)),
+                    STEP_TIMEOUT
+                )).decode()
         except EOFError:
             print("Disconnected", file=stderr)
             return 1
@@ -34,7 +37,10 @@ async def main() -> int:
         client.send(dumps(asdict(user_input)).encode() + NEWLINE_DELIMITER)
 
         try:
-            output_json: str = (await recv_line(client)).decode()
+            output_json: str = (await throw_on_timeout(
+                    create_task(recv_line(client)),
+                    STEP_TIMEOUT
+                )).decode()
         except EOFError:
             print("Disconnected", file=stderr)
             return 1
