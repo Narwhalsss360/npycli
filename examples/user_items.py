@@ -132,6 +132,9 @@ def help_cmd(
 
 @cli.retvals()
 def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
+    if cli.env.get("retvals cmd and retval", False):
+        return command, return_value
+
     if return_value is None:
         return
     print(f'{command.name}:\n{return_value}')
@@ -141,6 +144,7 @@ def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
 def errors(command: Command, exc: Exception) -> Optional[Any]:
     errors_string: str = "\n".join([f"{' ' * TAB_WIDTH}{e.__class__.__name__}: {e}" for e in causes(exc, True)])
     print(f'{command.name} error:\n{errors_string}')
+    return command, exc
 
 
 def as_prompter() -> None:
