@@ -2,8 +2,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 from json import dumps, loads
 from sys import stderr
-from asyncio import AbstractEventLoop, CancelledError, get_event_loop, run, wait, create_task, Task
-import asyncio
+from asyncio import AbstractEventLoop, CancelledError, get_event_loop, run, wait_for
 from socket import socket, AddressFamily, SocketKind, IPPROTO_TCP
 from enum import Enum
 from user_items import cli, EmptyEntriesError, CLIError, Command
@@ -46,22 +45,6 @@ def stop_server() -> Any:
     return STOP_SERVER_SENTINEL
 
 
-async def throw_on_timeout[T](task: Task[T], timeout: float) -> T:
-    await wait((
-        task,
-        create_task(asyncio.sleep(timeout))
-    ))
-
-    if not task.done():
-        raise TimeoutError()
-
-    if exc := task.exception():
-        raise exc
-
-    return task.result()
-
-
-
 async def recv_line(sock: socket) -> bytearray:
     received: bytearray = bytearray()
     loop: AbstractEventLoop = get_event_loop()
@@ -94,13 +77,13 @@ async def remote_cli_server() -> None:
             print(f"[INFO] {client_addr=} connected.")
 
             try:
-                initialization_json: str = (await throw_on_timeout(
-                    create_task(recv_line(client)),
-                    STEP_TIMEOUT
-                )).decode()
+                initialization_json: str = (await wait_for(recv_line(client), timeout=STEP_TIMEOUT)).decode()
             except EOFError:
                 print("[INFO] Disconnected", file=stderr)
                 client.close()
+                continue
+            except TimeoutError:
+                print("Timed our waiting for initialization", file=stderr)
                 continue
 
             try:
@@ -116,13 +99,13 @@ async def remote_cli_server() -> None:
             print("<", response)
 
             try:
-                user_input_json: str = (await throw_on_timeout(
-                    create_task(recv_line(client)),
-                    STEP_TIMEOUT
-                )).decode()
+                user_input_json: str = (await wait_for(recv_line(client), timeout=STEP_TIMEOUT)).decode()
             except EOFError:
                 print("[INFO] Disconnected", file=stderr)
                 client.close()
+                continue
+            except TimeoutError:
+                print("Timed our waiting for user input", file=stderr)
                 continue
 
             try:

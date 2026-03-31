@@ -76,8 +76,11 @@ def delete_cmd(key: str) -> str:
 
 @cli.cmd(names=('show', 'print'), help='Show a specific or all existing key-value pair(s).')
 @alias_cmd_kwargs({'key': ('k',)})
-def show_cmd(key: Optional[str] = None) -> str:
+def show_cmd(key: Optional[str] = None) -> Optional[str]:
     if key is None:
+        if not items():
+            return None
+
         longest_length: int = max(len(s) for s in items().keys())
         tab_count: int = ceil(longest_length / TAB_WIDTH)
         result: str = ''
