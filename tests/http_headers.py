@@ -15,4 +15,7 @@ def http_headers(
 
 if __name__ == "__main__":
     cmd: Command = Command(http_headers, ("http-headers",))
-    cmd(argv[1:])
+    if len(argv) == 1:
+        print(cmd.extended_command_help())
+    else:
+        cmd(argv[1:])
