@@ -125,7 +125,7 @@ async def remote_cli_server() -> None:
                 return_value = retval_unsafe[1]
                 response = Output(
                     OutputDirection.stdout,
-                    f"{command.name}:\n{return_value}"
+                    "Stopping server..." if return_value is STOP_SERVER_SENTINEL else f"{command.name}:\n{return_value}"
                 )
                 client.send(dumps(asdict(response)).encode() + NEWLINE_DELIMITER)
                 print("<", response)
@@ -149,8 +149,9 @@ async def remote_cli_server() -> None:
                 client.send(dumps(asdict(response)).encode() + NEWLINE_DELIMITER)
             finally:
                 client.close()
-                if return_value is STOP_SERVER_SENTINEL:
-                    break
+
+            if return_value is STOP_SERVER_SENTINEL:
+                break
 
 
 if __name__ == "__main__":
