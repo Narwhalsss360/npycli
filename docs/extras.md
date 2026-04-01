@@ -2,10 +2,11 @@
 
 ## Keyword argument aliases
 
-> [!NOTE]
-> If using `Annotated`, use the `Alias` type.
+> [!CAUTION]
+> Use `Annotated` and the `Alias` type for commands.
+> This is only for general use, including invoking a function in from within python.
 
-the `kwarg_aliasing` module provides a function decorator to give aliases to arguments.  
+The `kwarg_aliasing` module provides a function decorator to give aliases to arguments.  
 There is one for regular functions: `alias_kwargs`, and one for functions that would be a `Command`:
 `alias_cmd_kargs`.
 

@@ -14,7 +14,8 @@ To handle return values of `Command` functions, write a *callback* function that
 function will take as arguments the `Command` and the return value.
 This function may be used to _mutate_ the return value for the caller of `CLI.exec`.
 
-This return value handler will simply print the command name, and print the return value if not None.
+This return value handler will simply print the command name, and print the return value if not None. The return value of
+the handler will be returned to the caller of `cli.exec(..)` or `cli.prompt`, so in this case, `None` is always returned.
 
 ```python
 @cli.retvals()
@@ -30,7 +31,9 @@ To handle raised exceptions, write a *callback* function that will take as argum
 raised in, and the `Exception` itself.
 This function may be used to provide a return value for the caller of `CLI.exec`, otherwise errors `return None`
 
-This exception handler will simply print the exception, then exit.
+This exception handler will simply print the exception. The return value of
+the handler will be returned to the caller of `cli.exec(..)` or `cli.prompt`, so in this case, `None` is always returned.
+
 
 ```python
 @cli.errors()

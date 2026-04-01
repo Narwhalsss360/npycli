@@ -15,7 +15,7 @@ Use the static method `Command.create` to easily create, and use `Command`s.
 
 # Executing a `Command`
 
-Use bound function `Command.exec_with` or `()`/`__call__` operator.  
+Use method `Command.exec_with` or `()`/`__call__` operator.  
 **Arguments:**
 
 * `args: list[str]`

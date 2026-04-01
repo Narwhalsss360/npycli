@@ -197,6 +197,12 @@ class CommandParameter:
         out: str = ""
         for i, t in enumerate(self.argument_types):
             out += CommandParameter.type_name(t)
+            if t in CONTAINER_TYPES:
+                item_types: tuple[CommandParameterType, ...] | None = self.item_types
+                assert item_types is not None
+                out += f"[{' | '.join([
+                    CommandParameter.type_name(item_type) for item_type in item_types
+                ])}{', ...' if t is tuple else ''}]"
             if i != len(self.argument_types) - 1:
                 out += " | "
         return out
@@ -242,6 +248,12 @@ class CommandParameter:
         out += f"{tabstr}Types:\n"
         for i, t in enumerate(self.argument_types):
             out += f"{tabstr}{tab_chars}{CommandParameter.type_name(t)}"
+            if t in CONTAINER_TYPES:
+                item_types: tuple[CommandParameterType, ...] | None = self.item_types
+                assert item_types is not None
+                out += f"[{' | '.join([
+                    CommandParameter.type_name(item_type) for item_type in item_types
+                ])}{', ...' if t is tuple else ''}]"
             if i != len(self.argument_types) - 1:
                 out += "\n"
 
