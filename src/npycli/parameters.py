@@ -498,11 +498,12 @@ def parse_parameters(
     var_kwarg: str | None = None
     no_keywords: bool = False
     for i, entry in enumerate(entries):
-        if var_args is not None and var_args.bypasses_parsing and i >= var_args_index:
-            arguments.extend(entries[i:])
-            break
+        within_bypass: bool = var_args is not None and var_args.bypasses_parsing and i >= var_args_index
+        # if  var_args is not None and var_args.bypasses_parsing and i >= var_args_index:
+        #     arguments.extend(entries[i:])
+        #     break
 
-        if entry == argument_seperator:
+        if entry == argument_seperator and not within_bypass:
             no_keywords = True
             continue
 
@@ -534,6 +535,8 @@ def parse_parameters(
                         keyword_arguments[keyword] = True
                     else:
                         var_kwarg = keyword
+                elif within_bypass:
+                    arguments.append(entry)
                 else:
                     raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
             continue
@@ -571,7 +574,10 @@ def parse_parameters(
             var_kwarg = None
             continue
 
-        if var_args is not None and len(arguments) > var_args_index:
+        if within_bypass:
+            arguments.append(entry)
+            continue
+        elif var_args is not None and len(arguments) > var_args_index:
             arguments.append(parse_with_hooks(var_args, entry, parsers))
             continue
 
