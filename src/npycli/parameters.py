@@ -494,13 +494,14 @@ def parse_parameters(
     var_args_index: int = -1 if var_args is None else parameters.index(var_args)
     var_kwargs: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_KEYWORD, parameters), None)
 
-    if len(parameters) == 1 and parameters[0].bypasses_parsing:
-        return entries, {}
-
     keyword_parameter: CommandParameter | None = None
     var_kwarg: str | None = None
     no_keywords: bool = False
     for i, entry in enumerate(entries):
+        if var_args is not None and var_args.bypasses_parsing and i >= var_args_index:
+            arguments.extend(entries[i:])
+            break
+
         if entry == argument_seperator:
             no_keywords = True
             continue
