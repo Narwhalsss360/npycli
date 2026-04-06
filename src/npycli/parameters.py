@@ -413,10 +413,22 @@ class CommandParameterBuilder:
         return self._parameter
 
 
+def default_pre_parse_hook(s: str) -> str:
+    return s
+
+
+def default_post_parse_hook(s: str) -> str:
+    return s
+
+
+def default_err_parse_hook(_: str, exc: Exception) -> Any | Exception:
+    return exc
+
+
 def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[CommandParameterType, Callable[[str], Any]]) -> Any:
-    pre: Callable[[str], str] = lambda s: s
-    post: Callable[[Any], Any] = lambda o: o
-    err: Callable[[str, Exception], Any | Exception] = lambda _, e: e
+    pre: Callable[[str], str] = default_pre_parse_hook
+    post: Callable[[Any], Any] = default_post_parse_hook
+    err: Callable[[str, Exception], Any | Exception] = default_err_parse_hook
     if parameter.parse_hooks:
         pre = parameter.parse_hooks.pre or pre
         post = parameter.parse_hooks.post or post
