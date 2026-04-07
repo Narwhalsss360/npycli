@@ -297,7 +297,11 @@ class CommandParameterBuilder:
         self._appending_mode: bool = False
         self._built: bool = False
 
-        if isinstance(annotation, TypeAliasType) and get_origin(annotation.__value__) is Annotated:
+
+        if annotation is CommandParameter.empty:
+            self._parameter.names = (name,)
+            pass
+        elif isinstance(annotation, TypeAliasType) and get_origin(annotation.__value__) is Annotated:
             args: tuple[Any, ...] = get_args(annotation.__value__)
             self._next_annotation(args[0])
             for arg in args[1:]:

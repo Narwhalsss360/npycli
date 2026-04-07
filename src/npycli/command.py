@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Optional, Any, get_type_hints
 from dataclasses import dataclass, field
-from inspect import signature, Signature, Parameter, getdoc
+from inspect import signature, Signature, getdoc
 
 from .parameters import CommandParameter, ParameterKind, CommandParameterType, parse_parameters
 from .errors import ParsingError, CommandArgumentError
@@ -35,7 +35,7 @@ class Command:
             if name:
                 names = name,
             else:
-                names = function.__name__,
+                names = (function.__name__,)
 
         return Command(function=function, names=names, help=help,
                        kwarg_prefix=kwarg_prefix or "--")
@@ -95,10 +95,6 @@ class Command:
         :return:
         """
 
-#        positionals, keywords = extract_positionals_keywords(args, self.kwarg_prefix)
-#        args, kwargs = parse_args_as(positionals, keywords, self._positional_types, self._keyword_types,
-#                                     self._var_args_index, self._var_args_parser, parsers)
-
         try:
             args, kwargs = parse_parameters(self._parameters, entries, self.kwarg_prefix, self.kwarg_prefix, parsers or {})
             return self.function(*args, **kwargs)
@@ -134,44 +130,11 @@ class Command:
 
     def _extract_signature(self) -> None:
         self._signature: Signature = signature(self.function)
-        self._required_parameters: list[Parameter] = []
-        self._optional_parameters: list[Parameter] = []
-        self._positional_types: list[CommandParameterType] = []
-        self._keyword_types: dict[str, CommandParameterType] = {}
-        self._has_var_args: bool = False
-        self._var_args_index: Optional[int] = None
-        self._has_var_kwargs: bool = False
-        self._var_args_parser: Optional[CommandParameterType] = None
-        self._parameters: list[CommandParameter] = []
-
         annotations: dict[str, Any] = get_type_hints(self.function, include_extras=True)
-
-        for index, parameter in enumerate(self._signature.parameters.values()):
-            self._parameters.append(
-                CommandParameter.build(
-                    parameter.name,
-                    parameter.kind,
-                    annotations.get(parameter.name, str),
-                    default=parameter.default
-                )
-            )
-
-            if parameter.default == parameter.empty:
-                self._required_parameters.append(parameter)
-            else:
-                self._optional_parameters.append(parameter)
-
-            if parameter.kind == Parameter.VAR_POSITIONAL:
-                self._var_args_parser = self._parameters[-1].argument_types[0]
-                self._var_args_index = index
-                continue
-            if parameter.kind == Parameter.VAR_KEYWORD:
-                self._has_var_kwargs = True
-                continue
-
-            parameter_type: CommandParameterType = self._parameters[-1].argument_types[0]
-            self._positional_types.append(parameter_type)
-            self._keyword_types[parameter.name] = parameter_type
+        self._parameters: list[CommandParameter] = [
+            CommandParameter.build(p.name, p.kind, annotations.get(p.name, str), default=p.default)
+            for p in self._signature.parameters.values()
+        ]
 
     def _generate_details(self) -> None:
         self._details: list[str] = []
