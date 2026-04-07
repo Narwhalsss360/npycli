@@ -493,143 +493,174 @@ def add_to_container_type(container_type: Type[ContainerTypes], current: Contain
         raise ValueError(f"'container_type' must be of either {CONTAINER_TYPES}")
 
 
+class CommandParameterParser:
+    class Context:
+        def __init__(self, parameters: list[CommandParameter]) -> None:
+            self.arguments: list[Any] = []
+            self.keyword_arguments: dict[str, Any] = {}
+            self.var_args: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_POSITIONAL, parameters), None)
+            self.var_args_index: int = -1 if self.var_args is None else parameters.index(self.var_args)
+            self.var_kwargs: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_KEYWORD, parameters), None)
+            self.keyword_parameter: CommandParameter | None = None
+            self.var_kwarg: str | None = None
+            self.no_keywords: bool = False
+
+    def __init__(self, keyword_prefix: str, argument_separator: str, parsers: dict[CommandParameterType, Callable[[str], Any]]) -> None:
+        self.keyword_prefix: str = keyword_prefix
+        self.argument_separator: str = argument_separator
+        self.parsers: dict[CommandParameterType, Callable[[str], Any]] = parsers
+
+    def _next_keyword(self, context: CommandParameterParser.Context, parameters: list[CommandParameter], bypass_parse: bool, entries: list[str], i: int) -> None:
+        entry: str = entries[i]
+        if context.keyword_parameter is not None:
+            assert isinstance(context.keyword_parameter, CommandParameter)
+            raise MissingKeywordArgumentValueError(context.keyword_parameter.name, f"'{context.keyword_parameter.name}' is missing a value")
+        if context.var_kwarg is not None:
+            assert context.var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+            if bool in context.var_kwargs.argument_types:
+                context.keyword_arguments[context.var_kwarg] = True
+            else:
+                raise MissingKeywordArgumentValueError(f"'{context.var_kwarg}' is missing a value")
+
+        keyword = entry[len(self.keyword_prefix):]
+        context.keyword_parameter = next(filter(lambda p: keyword in p.names, parameters), None)
+        if context.keyword_parameter is not None:  # type: ignore
+            context.keyword_parameter = context.keyword_parameter
+            if context.keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
+                raise ParsingError(context.keyword_parameter.name, "This argument is positional only")
+            elif context.keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
+                if parameters.index(context.keyword_parameter) < len(context.arguments):
+                    raise ParsingError(context.keyword_parameter.name, f"'{context.keyword_parameter.name}' was already specified positionally")
+
+            if context.keyword_parameter.argument_types[0] is bool:  # Boolean flag
+                context.keyword_arguments[context.keyword_parameter.private_name] = True
+                context.keyword_parameter = None
+        else:
+            if context.var_kwargs is not None:
+                if bool in context.var_kwargs.argument_types and i == len(entries) - 1:
+                    context.keyword_arguments[keyword] = True
+                else:
+                    context.var_kwarg = keyword
+            elif bypass_parse:
+                context.arguments.append(entry)
+            else:
+                raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
+
+    def _next_keyword_value(self, context: CommandParameterParser.Context, parameters: list[CommandParameter], bypass_parse: bool, entries: list[str], i: int) -> None:
+        assert context.keyword_parameter is not None
+        assert isinstance(context.keyword_parameter, CommandParameter)
+
+        entry: str = entries[i]
+        if (container_type := context.keyword_parameter.container_type) is not None:
+            context.keyword_arguments[context.keyword_parameter.private_name] = add_to_container_type(
+                container_type,
+                context.keyword_arguments.get(context.keyword_parameter.private_name, None),
+                parse_with_hooks(context.keyword_parameter, entry, self.parsers)
+            )
+        elif context.keyword_parameter.kind == ParameterKind.VAR_POSITIONAL:
+            if len(context.arguments) <= context.var_args_index:
+                raise ParsingError(entry, "Cannot provide variable positional argument before positional-only and positional-or-keyword parameters.")
+            context.arguments.append(parse_with_hooks(context.keyword_parameter, entry, self.parsers))
+        else:
+            context.keyword_arguments[context.keyword_parameter.private_name] = parse_with_hooks(context.keyword_parameter, entry, self.parsers)
+
+        context.keyword_parameter = None
+
+    def _next_var_kwarg_value(self, context: CommandParameterParser.Context, parameters: list[CommandParameter], bypass_parse: bool, entries: list[str], i: int) -> None:
+        assert context.var_kwarg is not None
+        assert context.var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+
+        entry: str = entries[i]
+        if (container_type := context.var_kwargs.container_type) is not None:
+            if context.var_kwarg not in context.keyword_arguments:
+                context.keyword_arguments[context.var_kwarg] = container_type()
+            context.keyword_arguments[context.var_kwarg] = add_to_container_type(
+                container_type,
+                context.keyword_arguments[context.var_kwarg],
+                parse_with_hooks(context.var_kwargs, entry, self.parsers)
+            )
+        else:
+            context.keyword_arguments[context.var_kwarg] = parse_with_hooks(context.var_kwargs, entry, self.parsers)
+        context.var_kwarg = None
+
+    def _validate(self, context: CommandParameterParser.Context, parameters: list[CommandParameter]) -> None:
+        required_positionals: int = 0
+        for i, parameter in enumerate(parameters):
+            if parameter.kind == ParameterKind.POSITIONAL_ONLY:
+                if parameter.default == parameter.empty and len(context.arguments) <= i:
+                    raise ParsingError(parameter.name, f"Missing required positional '{parameter.name}'")
+                continue
+
+            if parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
+                if parameter.default != parameter.empty:
+                    continue
+                if len(context.arguments) > i:
+                    continue
+                if parameter.private_name not in context.keyword_arguments:
+                    raise ParsingError(parameter.name, f"Missing required keyword/positional '{parameter.name}'")
+            if parameter.default != parameter.empty or parameter.kind in (ParameterKind.VAR_POSITIONAL, ParameterKind.VAR_KEYWORD):
+                continue
+
+            if parameter.private_name not in context.keyword_arguments:
+                raise ParsingError(parameter.name, f"Missing required keyword '{parameter.name}'")
+
+        if len(context.arguments) < required_positionals:
+            raise ParsingError(parameters[len(context.arguments)].name, f"Missing required positional '{parameters[len(context.arguments)].name}'")
+
+    def parse(self, parameters: list[CommandParameter], entries: list[str]) -> tuple[list[Any], dict[str, Any]]:
+        context: CommandParameterParser.Context = CommandParameterParser.Context(parameters)
+
+        for i, entry in enumerate(entries):
+            within_bypass: bool = context.var_args is not None and context.var_args.bypasses_parsing and i >= context.var_args_index
+
+            if entry == self.argument_separator and not within_bypass:
+                context.no_keywords = True
+                continue
+
+            if not context.no_keywords and entry.startswith(self.keyword_prefix):
+                self._next_keyword(context, parameters, within_bypass, entries, i)
+                continue
+
+            if context.keyword_parameter is not None:
+                self._next_keyword_value(context, parameters, within_bypass, entries, i)
+                continue
+
+            if context.var_kwarg is not None:
+                self._next_var_kwarg_value(context, parameters, within_bypass, entries, i)
+                continue
+
+            if within_bypass:
+                context.arguments.append(entry)
+                continue
+            elif context.var_args is not None and len(context.arguments) > context.var_args_index:
+                context.arguments.append(parse_with_hooks(context.var_args, entry, self.parsers))
+                continue
+
+            if len(context.arguments) >= len(parameters):
+                raise ParsingError(context.arguments[len(parameters) - (1 if len(context.arguments) == len(parameters) else 0)], "Too many positional arguments")
+
+            parameter: CommandParameter = parameters[len(context.arguments)]
+            if parameter.kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
+                raise ParsingError(context.arguments[len(parameters)], "Too many positional arguments")
+            context.arguments.append(parse_with_hooks(parameter, entry, self.parsers))
+
+        if context.keyword_parameter is not None:
+            raise MissingKeywordArgumentValueError(context.keyword_parameter.name, f"'{context.keyword_parameter.name}' is missing a value")
+        if context.var_kwarg is not None:
+            raise MissingKeywordArgumentValueError(context.var_kwarg, f"'{context.var_kwarg}' is missing a value")
+
+        self._validate(context, parameters)
+        return context.arguments, context.keyword_arguments
+
+
 def parse_parameters(
     parameters: list[CommandParameter],
     entries: list[str],
     keyword_prefix: str,
-    argument_seperator: str,
+    argument_separator: str,
     parsers: dict[CommandParameterType, Callable[[str], Any]]
 ) -> tuple[list[Any], dict[str, Any]]:
-    arguments: list[Any] = []
-    keyword_arguments: dict[str, Any] = {}
-    var_args: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_POSITIONAL, parameters), None)
-    var_args_index: int = -1 if var_args is None else parameters.index(var_args)
-    var_kwargs: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_KEYWORD, parameters), None)
-
-    keyword_parameter: CommandParameter | None = None
-    var_kwarg: str | None = None
-    no_keywords: bool = False
-    for i, entry in enumerate(entries):
-        within_bypass: bool = var_args is not None and var_args.bypasses_parsing and i >= var_args_index
-        # if  var_args is not None and var_args.bypasses_parsing and i >= var_args_index:
-        #     arguments.extend(entries[i:])
-        #     break
-
-        if entry == argument_seperator and not within_bypass:
-            no_keywords = True
-            continue
-
-        if not no_keywords and entry.startswith(keyword_prefix):
-            if keyword_parameter is not None:
-                assert isinstance(keyword_parameter, CommandParameter)
-                raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
-            if var_kwarg is not None:
-                assert var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
-                if bool in var_kwargs.argument_types:
-                    keyword_arguments[var_kwarg] = True
-                else:
-                    raise MissingKeywordArgumentValueError(f"'{var_kwarg}' is missing a value")
-
-            keyword = entry[len(keyword_prefix):]
-            if (keyword_parameter := next(filter(lambda p: keyword in p.names, parameters), None)) is not None:  # type: ignore
-                if keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
-                    raise ParsingError(keyword_parameter.name, "This argument is positional only")
-                elif keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
-                    if parameters.index(keyword_parameter) < len(arguments):
-                        raise ParsingError(keyword_parameter.name, f"'{keyword_parameter.name}' was already specified positionally")
-
-                if keyword_parameter.argument_types[0] is bool:  # Boolean flag
-                    keyword_arguments[keyword_parameter.private_name] = True
-                    keyword_parameter = None
-            else:
-                if var_kwargs is not None:
-                    if bool in var_kwargs.argument_types and i == len(entries) - 1:
-                        keyword_arguments[keyword] = True
-                    else:
-                        var_kwarg = keyword
-                elif within_bypass:
-                    arguments.append(entry)
-                else:
-                    raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
-            continue
-
-        if keyword_parameter is not None:
-            assert isinstance(keyword_parameter, CommandParameter)
-            if (container_type := keyword_parameter.container_type) is not None:
-                keyword_arguments[keyword_parameter.private_name] = add_to_container_type(
-                    container_type,
-                    keyword_arguments.get(keyword_parameter.private_name, None),
-                    parse_with_hooks(keyword_parameter, entry, parsers)
-                )
-            elif keyword_parameter.kind == ParameterKind.VAR_POSITIONAL:
-                if len(arguments) <= var_args_index:
-                    raise ParsingError(entry, "Cannot provide variable positional argument before positional-only and positional-or-keyword parameters.")
-                arguments.append(parse_with_hooks(keyword_parameter, entry, parsers))
-            else:
-                keyword_arguments[keyword_parameter.private_name] = parse_with_hooks(keyword_parameter, entry, parsers)
-
-            keyword_parameter = None
-            continue
-
-        if var_kwarg is not None:
-            assert var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
-            if (container_type := var_kwargs.container_type) is not None:
-                if var_kwarg not in keyword_arguments:
-                    keyword_arguments[var_kwarg] = container_type()
-                keyword_arguments[var_kwarg] = add_to_container_type(
-                    container_type,
-                    keyword_arguments[var_kwarg],
-                    parse_with_hooks(var_kwargs, entry, parsers)
-                )
-            else:
-                keyword_arguments[var_kwarg] = parse_with_hooks(var_kwargs, entry, parsers)
-            var_kwarg = None
-            continue
-
-        if within_bypass:
-            arguments.append(entry)
-            continue
-        elif var_args is not None and len(arguments) > var_args_index:
-            arguments.append(parse_with_hooks(var_args, entry, parsers))
-            continue
-
-        if len(arguments) >= len(parameters):
-            raise ParsingError(arguments[len(parameters) - (1 if len(arguments) == len(parameters) else 0)], "Too many positional arguments")
-
-        parameter: CommandParameter = parameters[len(arguments)]
-        if parameter.kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
-            raise ParsingError(arguments[len(parameters)], "Too many positional arguments")
-        arguments.append(parse_with_hooks(parameter, entry, parsers))
-
-    if keyword_parameter is not None:
-        raise MissingKeywordArgumentValueError(keyword_parameter.name, f"'{keyword_parameter.name}' is missing a value")
-    if var_kwarg is not None:
-        raise MissingKeywordArgumentValueError(var_kwarg, f"'{var_kwarg}' is missing a value")
-
-    required_positionals: int = 0
-    for i, parameter in enumerate(parameters):
-        if parameter.kind == ParameterKind.POSITIONAL_ONLY:
-            if parameter.default == parameter.empty and len(arguments) <= i:
-                raise ParsingError(parameter.name, f"Missing required positional '{parameter.name}'")
-            continue
-
-        if parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
-            if parameter.default != parameter.empty:
-                continue
-            if len(arguments) > i:
-                continue
-            if parameter.private_name not in keyword_arguments:
-                raise ParsingError(parameter.name, f"Missing required keyword/positional '{parameter.name}'")
-        if parameter.default != parameter.empty or parameter.kind in (ParameterKind.VAR_POSITIONAL, ParameterKind.VAR_KEYWORD):
-            continue
-
-        if parameter.private_name not in keyword_arguments:
-            raise ParsingError(parameter.name, f"Missing required keyword '{parameter.name}'")
-
-    if len(arguments) < required_positionals:
-        raise ParsingError(parameters[len(arguments)].name, f"Missing required positional '{parameters[len(arguments)].name}'")
-
-    return arguments, keyword_arguments
+    return CommandParameterParser(keyword_prefix, argument_separator, parsers).parse(parameters, entries)
 
 
 __all__ = [
