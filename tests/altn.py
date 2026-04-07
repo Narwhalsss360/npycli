@@ -1,6 +1,6 @@
 from sys import stdout
 from os import get_terminal_size, terminal_size
-from npycli.ansi import USE_ALTERNATE_SCREEN_BUFFER, USE_MAIN_SCREEN_BUFFER, CURSOR_POSITION, SHOW_CURSOR, SAVE_CURRENT_CURSOR_POSITION, RESTORE_SAVED_CURSOR_POSITION
+from npycli.ansi import USE_ALTERNATE_SCREEN_BUFFER, USE_MAIN_SCREEN_BUFFER, CURSOR_POSITION, SHOW_CURSOR
 from time import sleep
 
 
@@ -9,7 +9,7 @@ def draw_screen(char: str, tsize: terminal_size) -> None:
     CURSOR_POSITION(0, 0)
     SHOW_CURSOR()
     parity = True
-    for lineno in range(tsize.lines):
+    for _ in range(tsize.lines):
         for i in range(tsize.columns):
             if (i % 2 == 0) == parity:
                 print(char, end="")

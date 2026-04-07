@@ -1,8 +1,8 @@
 import asyncio
 import inspect
 import shlex
-from collections.abc import Callable
 from typing import Optional, Any
+from types import FunctionType
 from npycli import CLI, Command, EmptyEntriesError, CLIError
 
 
@@ -26,7 +26,7 @@ async def cleanup():
 
 
 @cli.cmd()
-async def quit() -> Callable[[], None]:
+async def quit() -> FunctionType:
     print("Quiting and cleaning up...")
     await cleanup()
     return quit

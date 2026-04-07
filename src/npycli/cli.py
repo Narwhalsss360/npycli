@@ -59,8 +59,8 @@ class CLI:
 
         self._commands.append(command)
 
-    def cmd(self, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None, help: Optional[str] = None) \
-            -> Callable[[Callable[..., Any]], Callable[..., Optional[Any]]]:
+    def cmd[**P, R](self, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None, help: Optional[str] = None) \
+            -> Callable[[Callable[P, R]], Callable[P, R]]:
         """
         Curry function that creates a decorator that creates a `Command` from the function.
         :param name: Name of `Command`
@@ -69,7 +69,7 @@ class CLI:
         :return: Decorator
         """
 
-        def decorator(function: Callable[..., Any]) -> Callable[..., Optional[Any]]:
+        def decorator(function: Callable[P, R]) -> Callable[P, R]:
             self.add_command(
                 Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix)
             )
