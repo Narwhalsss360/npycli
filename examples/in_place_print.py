@@ -1,8 +1,8 @@
 from os import get_terminal_size
-from sys import stderr, argv
+from sys import stdout, stderr, argv
 from time import sleep
 from io import StringIO
-from typing import Callable, Generator, Any, Literal
+from typing import Callable, Generator, Any, Literal, TextIO
 from npycli.ansi import CURSOR_UP, HIDE_CURSOR, INSERT_NEW_LINE, SELECT_CHARACTER_RENDITION, SCR_RESET, BACKGROUND_RED, FOREGROUND_WHITE, SET_BOLD_MODE, strip_ansi, SHOW_CURSOR
 from npycli.parsing import create_literal_parser
 from npycli import Command
@@ -26,29 +26,39 @@ type terminal_size_getter_type = Callable[[], tuple[terminal_columns_type, termi
 
 
 class InPlacePrint:
-    def __init__(self) -> None:
+    def __init__(self, file: TextIO = stdout) -> None:
         self.last_lines: list[str] | None = None
+        self._file: TextIO = file
 
     @staticmethod
     def wrap(string: str, columns: int) -> list[str]:
         lines: list[str] = string.split("\n")
-        for i in range(len(lines)):
+        i: int = 0
+        while i < len(lines):
             if len(strip_ansi(lines[i])) > columns:
                 this, next = lines[i][:columns], lines[i][columns:]
                 lines[i] = this
                 lines.insert(i + 1, next)
+            i += 1
         return lines
 
     @staticmethod
     def pad(lines: list[str], padding: list[int]) -> list[str]:
         if len(lines) != len(padding):
             raise ValueError("'lines' and 'padding' must be the same size.")
-        return [line.ljust(pad) for line, pad in zip(lines, padding)]
+
+        padded: list[str] = lines.copy()
+        for i, (padded_line, pad) in enumerate(zip(padded, padding)):
+            stripped_len: int = len(strip_ansi(padded_line))
+            if stripped_len < pad:
+                padded[i] = f"{padded[i]}{' ' * (pad - stripped_len)}"
+
+        return padded
 
     def print(self, *values: Any, sep: str = " ", end: str = "\n") -> bool:
         buffer: StringIO = StringIO()
         print(*values, sep=sep, end=end, file=buffer, flush=True)
-        terminal_size = get_terminal_size()
+        terminal_size = get_terminal_size(self._file.fileno())
         lines: list[str] = InPlacePrint.wrap(buffer.getvalue(), terminal_size.columns)
         with_clearing: list[str] = lines.copy()
 
@@ -57,46 +67,57 @@ class InPlacePrint:
                 clearing_line: str = " " * terminal_size.columns
                 with_clearing.extend(clearing_line for _ in range(len(self.last_lines) - len(lines)))
 
-            padding: list[int] = [len(last_line) for last_line in self.last_lines]
+            padding: list[int] = [len(strip_ansi(last_line)) for last_line in self.last_lines]
             if len(padding) < len(with_clearing):
                 padding.extend(0 for _ in range(len(lines) - len(padding)))
             with_clearing = InPlacePrint.pad(with_clearing, padding)
 
         self.last_lines = lines
-        print("\n".join(with_clearing))
+        print("\n".join(with_clearing), file=self._file)
         if len(with_clearing) >= terminal_size.lines:
             self.last_lines = None
             if len(with_clearing) > len(lines):
-                CURSOR_UP(len(with_clearing) - len(lines))
+                CURSOR_UP(len(with_clearing) - len(lines), file=self._file)
             return False
 
-        CURSOR_UP(len(with_clearing))
+        CURSOR_UP(len(with_clearing), file=self._file)
         return True
 
     def print_above(self, *values: Any, sep: str = " ", end: str = "") -> None:
         buffer: StringIO = StringIO()
         print(*values, sep=sep, end=end, file=buffer, flush=True)
-        terminal_size = get_terminal_size()
+        terminal_size = get_terminal_size(self._file.fileno())
         lines: list[str] = InPlacePrint.wrap(buffer.getvalue(), terminal_size.columns)
 
         if not self.last_lines:
-            print("\n".join(lines))
+            print("\n".join(lines), file=self._file)
             return
 
-        INSERT_NEW_LINE(repeat=len(lines))
-        print("\n".join(lines))
+        INSERT_NEW_LINE(repeat=len(lines), file=self._file)
+        print("\n".join(lines), file=self._file)
 
     def clear(self) -> bool:
         if self.last_lines is None:
             return True
-        terminal_size = get_terminal_size()
+        terminal_size = get_terminal_size(self._file.fileno())
         if len(self.last_lines) >= terminal_size.lines:
             self.last_lines = None
             return False
 
         clearing_line: str = " " * terminal_size.columns
-        print("\n".join([clearing_line for _ in range(len(self.last_lines))]))
-        CURSOR_UP(len(self.last_lines))
+        print("\n".join([clearing_line for _ in range(len(self.last_lines))]), file=self._file)
+        CURSOR_UP(len(self.last_lines), file=self._file)
+        return True
+
+    def done(self) -> bool:
+        if self.last_lines is None:
+            return True
+        terminal_size = get_terminal_size(self._file.fileno())
+        if len(self.last_lines) >= terminal_size.lines:
+            self.last_lines = None
+            return False
+
+        print("\n" * len(self.last_lines), end="", file=self._file)
         return True
 
     def __call__(self, *values: Any, sep: str = " ", end: str = "\n") -> bool:
