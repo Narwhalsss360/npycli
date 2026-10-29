@@ -1,6 +1,8 @@
-from sys import argv
-from typing import Annotated, Iterable, Iterator, cast
-from npycli import Command, ParsingError, AnnotationPreview
+from collections.abc import Iterable, Iterator
+from sys import argv, exit
+from typing import Annotated, cast
+
+from npycli import AnnotationPreview, Command, ParsingError
 
 
 class GenericConfigKVP:
@@ -8,7 +10,7 @@ class GenericConfigKVP:
         if delimiter is None:
             raise TypeError("This must be a base class, where the 'delimiter' argument is specified")
         if delimiter not in arg:
-            raise ParsingError(f"{GenericConfigKVP.__name__}({repr(delimiter)}): Argument does not have delimiter.")
+            raise ParsingError(f"{GenericConfigKVP.__name__}({delimiter!r}): Argument does not have delimiter.")
         index = arg.index(delimiter)
 
         self.delimiter: str = delimiter

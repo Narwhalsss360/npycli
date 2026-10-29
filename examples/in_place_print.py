@@ -1,12 +1,23 @@
-from os import get_terminal_size
-from sys import stdout, stderr, argv
-from time import sleep
-from io import StringIO
-from typing import Callable, Generator, Any, Literal, TextIO
-from npycli.ansi import CURSOR_UP, HIDE_CURSOR, INSERT_NEW_LINE, SELECT_CHARACTER_RENDITION, SCR_RESET, BACKGROUND_RED, FOREGROUND_WHITE, SET_BOLD_MODE, strip_ansi, SHOW_CURSOR
-from npycli.parsing import create_literal_parser
-from npycli import Command
 import builtins
+from collections.abc import Callable, Generator
+from io import StringIO
+from os import get_terminal_size
+from sys import argv, stderr, stdout
+from time import sleep
+from typing import Any, Literal, TextIO
+
+from npycli import Command
+from npycli.ansi.const.p_rm import HIDE_CURSOR
+from npycli.ansi.const.p_sm import SHOW_CURSOR
+from npycli.ansi.const.sgr import (
+    BOLD_OR_INCREASED_INTENSITY,
+    DEFAULT_RENDITION,
+    RED_BACKGROUND,
+    WHITE_DISPLAY,
+)
+from npycli.ansi.parsing import strip_control_sequences
+from npycli.ansi.sequences import CUU, IL, P_RM, P_SM, SGR
+from npycli.parsing import create_literal_parser
 
 
 def wrap_and_pad_lines(string: str, columns: int) -> str:
@@ -20,9 +31,9 @@ def wrap_and_pad_lines(string: str, columns: int) -> str:
     return "".join(lines)
 
 
-type terminal_columns_type = int
-type terminal_lines_type = int
-type terminal_size_getter_type = Callable[[], tuple[terminal_columns_type, terminal_lines_type]]
+type TerminalColumnsType = int
+type TerminalLinesType = int
+type TerminalSizeGetterType = Callable[[], tuple[TerminalColumnsType, TerminalLinesType]]
 
 
 class InPlacePrint:
@@ -35,7 +46,7 @@ class InPlacePrint:
         lines: list[str] = string.split("\n")
         i: int = 0
         while i < len(lines):
-            if len(strip_ansi(lines[i])) > columns:
+            if len(strip_control_sequences(lines[i])) > columns:
                 this, next = lines[i][:columns], lines[i][columns:]
                 lines[i] = this
                 lines.insert(i + 1, next)
@@ -49,7 +60,7 @@ class InPlacePrint:
 
         padded: list[str] = lines.copy()
         for i, (padded_line, pad) in enumerate(zip(padded, padding)):
-            stripped_len: int = len(strip_ansi(padded_line))
+            stripped_len: int = len(strip_control_sequences(padded_line))
             if stripped_len < pad:
                 padded[i] = f"{padded[i]}{' ' * (pad - stripped_len)}"
 
@@ -67,7 +78,7 @@ class InPlacePrint:
                 clearing_line: str = " " * terminal_size.columns
                 with_clearing.extend(clearing_line for _ in range(len(self.last_lines) - len(lines)))
 
-            padding: list[int] = [len(strip_ansi(last_line)) for last_line in self.last_lines]
+            padding: list[int] = [len(strip_control_sequences(last_line)) for last_line in self.last_lines]
             if len(padding) < len(with_clearing):
                 padding.extend(0 for _ in range(len(lines) - len(padding)))
             with_clearing = InPlacePrint.pad(with_clearing, padding)
@@ -77,10 +88,10 @@ class InPlacePrint:
         if len(with_clearing) >= terminal_size.lines:
             self.last_lines = None
             if len(with_clearing) > len(lines):
-                CURSOR_UP(len(with_clearing) - len(lines), file=self._file)
+                CUU(len(with_clearing) - len(lines), file=self._file)
             return False
 
-        CURSOR_UP(len(with_clearing), file=self._file)
+        CUU(len(with_clearing), file=self._file)
         return True
 
     def print_above(self, *values: Any, sep: str = " ", end: str = "") -> None:
@@ -93,7 +104,7 @@ class InPlacePrint:
             print("\n".join(lines), file=self._file)
             return
 
-        INSERT_NEW_LINE(repeat=len(lines), file=self._file)
+        IL(len(lines), file=self._file)
         print("\n".join(lines), file=self._file)
 
     def clear(self) -> bool:
@@ -106,7 +117,7 @@ class InPlacePrint:
 
         clearing_line: str = " " * terminal_size.columns
         print("\n".join([clearing_line for _ in range(len(self.last_lines))]), file=self._file)
-        CURSOR_UP(len(self.last_lines), file=self._file)
+        CUU(len(self.last_lines), file=self._file)
         return True
 
     def done(self) -> bool:
@@ -158,19 +169,18 @@ def main(
     bounce_object: BounceObject = "ball"
 ) -> None:
     in_place_print: InPlacePrint = InPlacePrint()
-    if bounce_object == "ball":
-        if min != 0:
-            raise ValueError("min with ball must be 0")
+    if bounce_object == "ball" and min != 0:
+        raise ValueError("min with ball must be 0")
 
     if max < min:
         raise ValueError("Must not have max < min")
 
     bounces: int = -1
     bounce_message: str = ""
-    HIDE_CURSOR()
+    P_RM(HIDE_CURSOR, file=stdout)
     try:
         for n in bouncer(min, max, direction == "increasing", max_iterations):
-            bounce_message_lines: list[str] = [strip_ansi(line) for line in bounce_message.splitlines()]
+            bounce_message_lines: list[str] = [strip_control_sequences(line) for line in bounce_message.splitlines()]
             separator_width: int = len("  Bounce: 1") if len(bounce_message) == 0 else builtins.max(len(line) for line in bounce_message_lines)
             if bounce_object == "numbers":
                 s: str = f"{"\u2500" * separator_width}\n{"\n".join(str(i + bounces) for i in range(n))}"
@@ -189,10 +199,10 @@ def main(
     except KeyboardInterrupt:
         in_place_print.clear()
     except Exception:
-        SHOW_CURSOR()
+        P_SM(SHOW_CURSOR, file=stdout)
         raise
     finally:
-        SHOW_CURSOR()
+        P_SM(SHOW_CURSOR, file=stdout)
 
 
 if __name__ == "__main__":
@@ -203,9 +213,9 @@ if __name__ == "__main__":
         })
     except ValueError as e:
         print(
-            SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, BACKGROUND_RED, FOREGROUND_WHITE),
+            SGR(BOLD_OR_INCREASED_INTENSITY, RED_BACKGROUND, WHITE_DISPLAY),
             "ERROR",
-            SELECT_CHARACTER_RENDITION.with_args(SCR_RESET),
+            SGR(DEFAULT_RENDITION),
             f": {e}",
             sep="",
             end="",

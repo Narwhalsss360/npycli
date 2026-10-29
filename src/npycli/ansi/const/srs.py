@@ -1,0 +1,7 @@
+START_REVERSED = 0
+END_REVERSED = 1
+
+__all__ = [
+    'START_REVERSED',
+    'END_REVERSED'
+]

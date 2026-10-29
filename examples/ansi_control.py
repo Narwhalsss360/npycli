@@ -1,21 +1,16 @@
-from typing import Any, TextIO
-from sys import stdout
 from io import StringIO
 from os import get_terminal_size
-from npycli.ansi import (
-    send_ansi,
-    strip_ansi,
-    SAVE_CURRENT_CURSOR_POSITION,
-    CURSOR_DOWN,
-    CURSOR_UP,
-    INSERT_NEW_LINE,
-    RESTORE_SAVED_CURSOR_POSITION,
-    SELECT_CHARACTER_RENDITION,
-    FOREGROUND_RED,
-    BACKGROUND_WHITE,
-    SET_BOLD_MODE,
-    SCR_RESET
+from sys import stdout
+from typing import Any, TextIO
+
+from npycli.ansi.const.sgr import (
+    BOLD_OR_INCREASED_INTENSITY,
+    DEFAULT_RENDITION,
+    RED_DISPLAY,
+    WHITE_BACKGROUND,
 )
+from npycli.ansi.parsing import strip_control_sequences
+from npycli.ansi.sequences import CUD, CUU, IL, RCP, SCCP, SGR
 
 
 def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextIO = stdout, current_is_empty: bool = False, lines_above: int = 1) -> None:
@@ -34,42 +29,42 @@ def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextI
 
     line_count: int = 1
     line_length: int = 0
-    for c in strip_ansi(output):
+    for c in strip_control_sequences(output):
         line_length += 1
         if line_length == max_columns or c == "\n":
             line_count += 1
             line_length = 0
 
-    send_ansi(SAVE_CURRENT_CURSOR_POSITION, flush=True)
+    SCCP(file=file)
     if current_is_empty:
         print("\n" * lines_above, file=file, end="", flush=True)
-        send_ansi(CURSOR_UP.with_args(lines_above), file=file, flush=True)
+        CUU(lines_above, file=file)
 
     # These ansi control commands may be supplied with arguments
     print("\n" * line_count, file=file, end="", flush=True)
-    send_ansi(CURSOR_UP.with_args(line_count + lines_above - (0 if current_is_empty else 1)), file=file, flush=True)
+    CUU(line_count + lines_above - (0 if current_is_empty else 1), file=file)
     # This one doesn't have argument, so we just repeat the command
-    send_ansi(INSERT_NEW_LINE, repeat=line_count, file=file, flush=True)
+    IL(line_count, file=file)
 
     # Flush, just in case current cursor position gets moved after output
     print(output, end='', file=file, flush=True)
-    send_ansi(RESTORE_SAVED_CURSOR_POSITION, file=file, flush=True)
-    send_ansi(CURSOR_DOWN.with_args(line_count), file=file, flush=True)
+    RCP(file=file)
+    CUD(line_count, file=file)
 
 
 # Prints in order
 print(1)
 print(2)
 print(4)
-print_above(f"3\n3.5", max_columns=get_terminal_size().columns, current_is_empty=True) # This line will be an empty line, so current_is_empty = True
-print_above(f"2.5", max_columns=get_terminal_size().columns, current_is_empty=True, lines_above=3) # This line will be an empty line, so current_is_empty = True
+print_above("3\n3.5", max_columns=get_terminal_size().columns, current_is_empty=True) # This line will be an empty line, so current_is_empty = True
+print_above("2.5", max_columns=get_terminal_size().columns, current_is_empty=True, lines_above=3) # This line will be an empty line, so current_is_empty = True
 
-SELECT_CHARACTER_RENDITION(SET_BOLD_MODE, FOREGROUND_RED, BACKGROUND_WHITE)
+SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY, WHITE_BACKGROUND, file=stdout)
 # Or
 print(1)
 print(2)
 print(4, end='')
-SELECT_CHARACTER_RENDITION(SCR_RESET)
-three = f"{SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, FOREGROUND_RED, BACKGROUND_WHITE)}3{SELECT_CHARACTER_RENDITION(SCR_RESET)}"
+SGR(DEFAULT_RENDITION, file=stdout)
+three = f"{SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY, WHITE_BACKGROUND)}3{SGR(DEFAULT_RENDITION)}"
 print_above(three, max_columns=get_terminal_size().columns)
 print()

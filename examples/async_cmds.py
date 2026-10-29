@@ -1,10 +1,10 @@
 import asyncio
 import inspect
 import shlex
-from typing import Optional, Any
 from types import FunctionType
-from npycli import CLI, Command, EmptyEntriesError, CLIError
+from typing import Any, Optional
 
+from npycli import CLI, CLIError, Command, EmptyEntriesError
 
 cli = CLI("async program")
 

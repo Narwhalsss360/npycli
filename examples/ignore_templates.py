@@ -1,17 +1,19 @@
-from sys import argv, stderr
+from asyncio import CancelledError, gather, run
 from os.path import basename
+from sys import argv, exit, stderr
 from typing import Annotated
-from asyncio import CancelledError, run, gather
-from aiohttp import ClientSession, ClientError, ClientResponseError
+
+from aiohttp import ClientError, ClientResponseError, ClientSession
+
 from npycli import Command, command
-from npycli.parameters import AnnotationPreview
-from npycli.errors import CommandArgumentError
-from npycli.ansi import (
-    SELECT_CHARACTER_RENDITION,
-    SET_BOLD_MODE,
-    FOREGROUND_RED,
-    SCR_RESET,
+from npycli.ansi.const.sgr import (
+    BOLD_OR_INCREASED_INTENSITY,
+    DEFAULT_RENDITION,
+    RED_DISPLAY,
 )
+from npycli.ansi.sequences import SGR
+from npycli.errors import CommandArgumentError
+from npycli.parameters import AnnotationPreview
 
 
 def print_error(e: Exception) -> None:
@@ -21,9 +23,9 @@ def print_error(e: Exception) -> None:
         message: str = f" {'\n\t'.join(str(arg) for arg in e.args)}"
 
     print(
-        SELECT_CHARACTER_RENDITION.with_args(SET_BOLD_MODE, FOREGROUND_RED),
+        SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY),
         f"{e.__class__.__name__}:",
-        SELECT_CHARACTER_RENDITION.with_args(SCR_RESET),
+        SGR(DEFAULT_RENDITION),
         " ", message,
         sep="",
         file=stderr,
