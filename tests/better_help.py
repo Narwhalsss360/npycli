@@ -1,9 +1,9 @@
 from types import NoneType
 from typing import Annotated, Optional
-from npycli import CLI, Command, EmptyEntriesError, CommandDoesNotExistError
+
+from npycli import CLI, Command, CommandDoesNotExistError, EmptyEntriesError
 from npycli.kwarg_aliasing import alias_cmd_kwargs
 from npycli.parameters import CommandParameter, Description
-
 
 TAB_CHARS: str = " " * 4
 
@@ -69,8 +69,7 @@ def show_help(
         longest_name_length: int = 0
         descriptions: list[str] = []
         for command in cli.commands:
-            if len(command.name) > longest_name_length:
-                longest_name_length = len(command.name)
+            longest_name_length = max(longest_name_length, len(command.name))
             names.append(command.name)
             descriptions.append(command.details or "")
 
@@ -109,7 +108,7 @@ def show_help(
         if parameter.default_preview:
             out += f"Default: {parameter.default_preview}"
         elif parameter.default != parameter.empty:
-            out += f"Default: {repr(parameter.default)}"
+            out += f"Default: {parameter.default!r}"
 
         if parameter.description:
             out += f"\n{parameter.description}"

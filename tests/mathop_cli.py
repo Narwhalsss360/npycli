@@ -1,5 +1,7 @@
+from collections.abc import Callable
 from sys import argv
-from typing import Callable, Optional
+from typing import Optional
+
 from npycli import Command
 
 

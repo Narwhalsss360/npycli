@@ -1,11 +1,16 @@
-from typing import Any, TextIO
-from time import sleep
+from io import StringIO
 from os import get_terminal_size
 from pathlib import Path
 from sys import argv, stdout
-from io import StringIO
+from time import sleep
+from typing import Any, TextIO
+
 from npycli import Command
-from npycli.ansi import CURSOR_UP, SELECT_CHARACTER_RENDITION, SCR_RESET, SET_UNDERLINE_MODE, SET_BLINKING_MODE, INSERT_NEW_LINE, HIDE_CURSOR, SHOW_CURSOR, strip_ansi
+from npycli.ansi.const.p_rm import HIDE_CURSOR
+from npycli.ansi.const.p_sm import SHOW_CURSOR
+from npycli.ansi.const.sgr import DEFAULT_RENDITION, SINGLY_UNDERLINED, SLOWLY_BLINKING
+from npycli.ansi.parsing import strip_control_sequences
+from npycli.ansi.sequences import CUU, IL, P_RM, P_SM, SGR
 
 
 class InPlacePrint:
@@ -18,7 +23,7 @@ class InPlacePrint:
         lines: list[str] = string.split("\n")
         i: int = 0
         while i < len(lines):
-            if len(strip_ansi(lines[i])) > columns:
+            if len(strip_control_sequences(lines[i])) > columns:
                 this, next = lines[i][:columns], lines[i][columns:]
                 lines[i] = this
                 lines.insert(i + 1, next)
@@ -32,7 +37,7 @@ class InPlacePrint:
 
         padded: list[str] = lines.copy()
         for i, (padded_line, pad) in enumerate(zip(padded, padding)):
-            stripped_len: int = len(strip_ansi(padded_line))
+            stripped_len: int = len(strip_control_sequences(padded_line))
             if stripped_len < pad:
                 padded[i] = f"{padded[i]}{' ' * (pad - stripped_len)}"
 
@@ -50,7 +55,7 @@ class InPlacePrint:
                 clearing_line: str = " " * terminal_size.columns
                 with_clearing.extend(clearing_line for _ in range(len(self.last_lines) - len(lines)))
 
-            padding: list[int] = [len(strip_ansi(last_line)) for last_line in self.last_lines]
+            padding: list[int] = [len(strip_control_sequences(last_line)) for last_line in self.last_lines]
             if len(padding) < len(with_clearing):
                 padding.extend(0 for _ in range(len(lines) - len(padding)))
             with_clearing = InPlacePrint.pad(with_clearing, padding)
@@ -60,10 +65,10 @@ class InPlacePrint:
         if len(with_clearing) >= terminal_size.lines:
             self.last_lines = None
             if len(with_clearing) > len(lines):
-                CURSOR_UP(len(with_clearing) - len(lines), file=self._file)
+                CUU(len(with_clearing) - len(lines), file=self._file)
             return False
 
-        CURSOR_UP(len(with_clearing), file=self._file)
+        CUU(len(with_clearing), file=self._file)
         return True
 
     def print_above(self, *values: Any, sep: str = " ", end: str = "") -> None:
@@ -76,7 +81,7 @@ class InPlacePrint:
             print("\n".join(lines), file=self._file)
             return
 
-        INSERT_NEW_LINE(repeat=len(lines), file=self._file)
+        IL(len(lines), file=self._file)
         print("\n".join(lines), file=self._file)
 
     def clear(self) -> bool:
@@ -89,7 +94,7 @@ class InPlacePrint:
 
         clearing_line: str = " " * terminal_size.columns
         print("\n".join([clearing_line for _ in range(len(self.last_lines))]), file=self._file)
-        CURSOR_UP(len(self.last_lines), file=self._file)
+        CUU(len(self.last_lines), file=self._file)
         return True
 
     def done(self) -> bool:
@@ -110,7 +115,7 @@ class InPlacePrint:
 def line_count_wrapped_at(s: str, column: int) -> int:
     line_count: int = 1
     line_length: int = 0
-    for c in strip_ansi(s):
+    for c in strip_control_sequences(s):
         line_length += 1
         if line_length == column or c == "\n":
             line_count += 1
@@ -154,12 +159,12 @@ def main(
 ) -> None:
     working_directory = working_directory or Path(".")
     print(
-        f"{SELECT_CHARACTER_RENDITION.with_args(SET_BLINKING_MODE)}Walking "
-        f"{SELECT_CHARACTER_RENDITION.with_args(SET_UNDERLINE_MODE)}{str(working_directory)}{SELECT_CHARACTER_RENDITION.with_args(SCR_RESET)}{SELECT_CHARACTER_RENDITION.with_args(SET_BLINKING_MODE)}"
-        f" ...{SELECT_CHARACTER_RENDITION.with_args(SCR_RESET)}"
+        f"{SGR(SLOWLY_BLINKING)}Walking "
+        f"{SGR(SINGLY_UNDERLINED)}{working_directory}{SGR(DEFAULT_RENDITION)}{SGR(SLOWLY_BLINKING)}"
+        f" ...{SGR(DEFAULT_RENDITION)}"
     )
 
-    HIDE_CURSOR()
+    P_RM(HIDE_CURSOR, file=stdout)
     in_place = InPlacePrint()
     try:
         for root, _, files in working_directory.walk():
@@ -169,14 +174,14 @@ def main(
                 sleep(interval)
 
         if in_place.clear():
-            CURSOR_UP()
+            CUU()
             print(" " * get_terminal_size().columns, end="\r")
         print("Done!")
     except KeyboardInterrupt:
         in_place.clear()
         raise
     finally:
-        SHOW_CURSOR()
+        P_SM(SHOW_CURSOR, file=stdout)
 
 
 if __name__ == "__main__":

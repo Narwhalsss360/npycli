@@ -1,5 +1,6 @@
 from sys import argv
 from typing import Annotated, Optional
+
 from npycli import Command
 from npycli.parameters import Alias, Description
 

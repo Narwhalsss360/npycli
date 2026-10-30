@@ -21,6 +21,7 @@ from .parameters import (
 )
 
 from . import ansi
+from . import ansi as ecma48
 from . import cli
 from . import command
 from . import errors
@@ -53,5 +54,6 @@ __all__ = [
     "errors",
     "kwarg_aliasing",
     "parameters",
-    "parsing"
+    "parsing",
+    "ecma48"
 ]

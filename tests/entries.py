@@ -1,4 +1,5 @@
 from sys import argv
+
 from npycli import Command
 from npycli.parameters import BypassParse
 
@@ -55,4 +56,4 @@ if __name__ == "__main__":
         command: Command = Command.create(f)
         print(command.extended_command_help())
         command.exec_with(argv[1:])
-        print("")
+        print()

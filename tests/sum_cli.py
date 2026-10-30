@@ -1,4 +1,5 @@
 from sys import argv
+
 from npycli import Command
 
 

@@ -1,5 +1,6 @@
-from sys import argv
 from pathlib import Path
+from sys import argv
+
 from npycli import Command
 
 
@@ -8,7 +9,7 @@ def main(**kwargs: tuple[int | str, ...]) -> None:
     for key, inner_values in kwargs.items():
         print(f"{key}:")
         for value in inner_values:
-            print(f"  {repr(value)}")
+            print(f"  {value!r}")
 
 
 DEFAULT_ARGS: list[str] = ["--a", "a.value", "--a", "1", "--b", "b.value1", "--b", "b.value2"]

@@ -1,7 +1,8 @@
-from typing import Optional, Any, Literal
 from enum import Enum
-from npycli import Command
 from json import dumps, loads
+from typing import Any, Literal, Optional
+
+from npycli import Command
 from npycli.parsing import create_enum_parser, create_literal_parser
 
 
