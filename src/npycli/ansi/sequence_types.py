@@ -30,7 +30,9 @@ def require_valid_bit_combination(combo: BitCombination, name: str | None = None
         raise ValueError(f"The bit combination {name} was invalid")
 
 
-def to_bit_combination(combo: tuple[CellAddress, CellAddress] | BitCombination | bytes | int) -> BitCombination:
+def to_bit_combination(
+    combo: tuple[CellAddress, CellAddress] | BitCombination | bytes | int,
+) -> BitCombination:
     if isinstance(combo, BitCombination):
         require_valid_bit_combination(combo)
         return combo
@@ -65,7 +67,10 @@ EMPTY_SEQUENCE: BitCombinationSequence = ()
 
 
 def to_bit_combination_sequence(
-        bit_combos: Iterable[int | bytes | BitCombination | tuple[CellAddress, CellAddress]]) -> BitCombinationSequence:
+    bit_combos: Iterable[
+        int | bytes | BitCombination | tuple[CellAddress, CellAddress]
+    ],
+) -> BitCombinationSequence:
     return tuple(to_bit_combination(combo) for combo in bit_combos)
 
 
@@ -124,11 +129,16 @@ class EscapeSequenceToken(ECMA48Token):
     @property
     @override
     def bytes(self) -> bytes:
-        return bytes((
-            bit_combination_to_ord(ESCAPE_BIT_COMBINATION),
-            *(bit_combination_to_ord(combo) for combo in self.intermediate_bit_combinations),
-            bit_combination_to_ord(self.final_bit_combination)
-        ))
+        return bytes(
+            (
+                bit_combination_to_ord(ESCAPE_BIT_COMBINATION),
+                *(
+                    bit_combination_to_ord(combo)
+                    for combo in self.intermediate_bit_combinations
+                ),
+                bit_combination_to_ord(self.final_bit_combination),
+            )
+        )
 
 
 type ControlSequenceParameter = int | None
@@ -140,7 +150,9 @@ EMPTY_PARAMETERS: ControlSequenceParameters = ()
 
 @dataclass(frozen=True)
 class ControlSequenceToken(ECMA48Token):
-    SEVEN_BIT_MODE_INTRODUCER = EscapeSequenceToken(EMPTY_SEQUENCE, to_bit_combination((5, 11)))
+    SEVEN_BIT_MODE_INTRODUCER = EscapeSequenceToken(
+        EMPTY_SEQUENCE, to_bit_combination((5, 11))
+    )
     EIGHT_BIT_MODE_INTRODUCER = ControlByteToken(to_bit_combination((9, 11)))
 
     introducer: ControlByteToken | EscapeSequenceToken
@@ -153,30 +165,49 @@ class ControlSequenceToken(ECMA48Token):
         super().__post_init__()
         if isinstance(self.introducer, EscapeSequenceToken):
             if self.introducer.intermediate_bit_combinations:
-                raise ValueError("The control sequence introducer must not have any intermediate bit combinations")
+                raise ValueError(
+                    "The control sequence introducer must not have any intermediate bit combinations"
+                )
             if self.introducer.final_bit_combination != to_bit_combination((5, 11)):
                 raise ValueError(
-                    "The control sequence introducer in 7-bit mode must have an introducer final byte of 05/11")
+                    "The control sequence introducer in 7-bit mode must have an introducer final byte of 05/11"
+                )
         elif self.introducer.bit_combination != to_bit_combination((9, 11)):
-            raise ValueError("The control sequence introducer in 8-bit mode must have an introducer control byte of 09/11")
+            raise ValueError(
+                "The control sequence introducer in 8-bit mode must have an introducer control byte of 09/11"
+            )
 
     @property
     @override
     def bytes(self) -> bytes:
-        private_marker: tuple[()] | tuple[int] = (bit_combination_to_ord(
-            self.private_marker.bit_combination),) if self.private_marker else ()
+        private_marker: tuple[()] | tuple[int] = (
+            (bit_combination_to_ord(self.private_marker.bit_combination),)
+            if self.private_marker
+            else ()
+        )
 
-        return bytes((
-            *self.introducer.bytes,
-            *private_marker,
-            *';'.join(str(x) if x is not None else "" for x in self.arguments).encode('utf-8'),
-            *(bit_combination_to_ord(combo) for combo in self.intermediate_bit_combinations_sequence),
-            bit_combination_to_ord(self.final_bit_combination)
-        ))
+        return bytes(
+            (
+                *self.introducer.bytes,
+                *private_marker,
+                *";".join(
+                    str(x) if x is not None else "" for x in self.arguments
+                ).encode("utf-8"),
+                *(
+                    bit_combination_to_ord(combo)
+                    for combo in self.intermediate_bit_combinations_sequence
+                ),
+                bit_combination_to_ord(self.final_bit_combination),
+            )
+        )
 
     @property
     def bit_mode(self) -> BitMode:
-        return BitMode.Seven if isinstance(self.introducer, EscapeSequenceToken) else BitMode.Eight
+        return (
+            BitMode.Seven
+            if isinstance(self.introducer, EscapeSequenceToken)
+            else BitMode.Eight
+        )
 
     def as_bit_mode(self, mode: BitMode) -> ControlSequenceToken:
         if mode == self.bit_mode:
@@ -188,7 +219,7 @@ class ControlSequenceToken(ECMA48Token):
                 private_marker=self.private_marker,
                 intermediate_bit_combinations_sequence=self.intermediate_bit_combinations_sequence,
                 arguments=self.arguments,
-                final_bit_combination=self.final_bit_combination
+                final_bit_combination=self.final_bit_combination,
             )
         else:
             return ControlSequenceToken(
@@ -196,7 +227,7 @@ class ControlSequenceToken(ECMA48Token):
                 private_marker=self.private_marker,
                 intermediate_bit_combinations_sequence=self.intermediate_bit_combinations_sequence,
                 arguments=self.arguments,
-                final_bit_combination=self.final_bit_combination
+                final_bit_combination=self.final_bit_combination,
             )
 
     @property
@@ -231,9 +262,13 @@ class ControlFunction[T: ECMA48Token](ABC):
     def __post_init__(self) -> None:
         pass
 
-    def _require_init_token_subclass_instance(self, subclass: type | tuple[type, ...], required_by: type) -> None:
+    def _require_init_token_subclass_instance(
+        self, subclass: type | tuple[type, ...], required_by: type
+    ) -> None:
         if not isinstance(self.init_token, subclass):
-            raise TypeError(f"{required_by} requires init_token to be of type {subclass}")
+            raise TypeError(
+                f"{required_by} requires init_token to be of type {subclass}"
+            )
 
     @property
     def token(self) -> T:
@@ -250,7 +285,9 @@ class ControlFunction[T: ECMA48Token](ABC):
     def __str__(self) -> str:
         return str(self.token)
 
-    def __call__(self, *_: None, file: TextIO, end: str = '', flush: bool | None = None) -> Self:
+    def __call__(
+        self, *_: None, file: TextIO, end: str = "", flush: bool | None = None
+    ) -> Self:
         flush = True if flush is None else flush
         print(str(self), end=end, file=file, flush=flush)
         return self
@@ -267,11 +304,17 @@ class C0ControlFunction(ControlFunction[ControlByteToken]):
 class C1ControlFunction(ControlFunction[ControlByteToken | EscapeSequenceToken]):
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._require_init_token_subclass_instance((ControlByteToken, EscapeSequenceToken), C1ControlFunction)
+        self._require_init_token_subclass_instance(
+            (ControlByteToken, EscapeSequenceToken), C1ControlFunction
+        )
 
     @property
     def bit_mode(self) -> BitMode:
-        return BitMode.Seven if isinstance(self.token, EscapeSequenceToken) else BitMode.Eight
+        return (
+            BitMode.Seven
+            if isinstance(self.token, EscapeSequenceToken)
+            else BitMode.Eight
+        )
 
     def as_bit_mode(self, mode: BitMode) -> C1ControlFunction:
         if mode == self.bit_mode:
@@ -286,10 +329,13 @@ class C1ControlFunction(ControlFunction[ControlByteToken | EscapeSequenceToken])
                 argument_count=self.argument_count,
                 default_arguments=self.default_arguments,
                 description=self.description,
-                init_token=EscapeSequenceToken(EMPTY_SEQUENCE, BitCombination(
-                    self.init_token.bit_combination.column - 4,
-                    self.init_token.bit_combination.row
-                )),
+                init_token=EscapeSequenceToken(
+                    EMPTY_SEQUENCE,
+                    BitCombination(
+                        self.init_token.bit_combination.column - 4,
+                        self.init_token.bit_combination.row,
+                    ),
+                ),
             )
         else:
             assert self.bit_mode is BitMode.Seven
@@ -300,10 +346,12 @@ class C1ControlFunction(ControlFunction[ControlByteToken | EscapeSequenceToken])
                 argument_count=self.argument_count,
                 default_arguments=self.default_arguments,
                 description=self.description,
-                init_token=ControlByteToken(BitCombination(
-                    self.init_token.final_bit_combination.column + 4,
-                    self.init_token.final_bit_combination.row
-                )),
+                init_token=ControlByteToken(
+                    BitCombination(
+                        self.init_token.final_bit_combination.column + 4,
+                        self.init_token.final_bit_combination.row,
+                    )
+                ),
             )
 
 
@@ -311,7 +359,9 @@ class C1ControlFunction(ControlFunction[ControlByteToken | EscapeSequenceToken])
 class ControlSequence(ControlFunction[ControlSequenceToken]):
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._require_init_token_subclass_instance(ControlSequenceToken, ControlSequence)
+        self._require_init_token_subclass_instance(
+            ControlSequenceToken, ControlSequence
+        )
 
     @property
     def bit_mode(self) -> BitMode:
@@ -331,6 +381,10 @@ class ControlSequence(ControlFunction[ControlSequenceToken]):
         )
 
     @property
+    def arguments(self) -> ControlSequenceParameters:
+        return self.token.arguments
+
+    @property
     def without_args(self) -> ControlSequence | None:
         return ControlSequence(
             abbreviation=self.abbreviation,
@@ -338,7 +392,7 @@ class ControlSequence(ControlFunction[ControlSequenceToken]):
             argument_count=self.argument_count,
             default_arguments=self.default_arguments,
             description=self.description,
-            init_token=self.token.without_args
+            init_token=self.token.without_args,
         )
 
     def with_args(self, args: ControlSequenceParameters) -> ControlSequence:
@@ -348,11 +402,17 @@ class ControlSequence(ControlFunction[ControlSequenceToken]):
             argument_count=self.argument_count,
             default_arguments=self.default_arguments,
             description=self.description,
-            init_token=self.token.with_args(args)
+            init_token=self.token.with_args(args),
         )
 
     @override
-    def __call__(self, *args: ControlSequenceParameter, file: TextIO | None = None, end: str = '', flush: bool | None = None) -> ControlSequence:
+    def __call__(
+        self,
+        *args: ControlSequenceParameter,
+        file: TextIO | None = None,
+        end: str = "",
+        flush: bool | None = None,
+    ) -> ControlSequence:
         with_args: ControlSequence = self.with_args(args)
         if file is not None:
             super(ControlSequence, with_args).__call__(file=file, end=end, flush=flush)
@@ -363,7 +423,9 @@ class ControlSequence(ControlFunction[ControlSequenceToken]):
 class IndependentControlFunction(ControlFunction[EscapeSequenceToken]):
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._require_init_token_subclass_instance(EscapeSequenceToken, IndependentControlFunction)
+        self._require_init_token_subclass_instance(
+            EscapeSequenceToken, IndependentControlFunction
+        )
 
 
 __all__ = [
@@ -393,5 +455,6 @@ __all__ = [
     "is_valid_bit_combination",
     "require_valid_bit_combination",
     "to_bit_combination",
-    "to_bit_combination_sequence"
+    "to_bit_combination_sequence",
 ]
+
