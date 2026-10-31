@@ -543,7 +543,7 @@ def parse_with_hooks(
             try:
                 parsed = parser(entry)
                 break
-            except Exception as exc:
+            except (ParsingError, TypeError, ValueError, RuntimeError) as exc:
                 if not isinstance(handled := err(entry, exc), Exception):
                     parsed = handled
                     break
@@ -553,16 +553,16 @@ def parse_with_hooks(
                 ):
                     continue
 
+                parsing_error = ParsingError(
+                    entry,
+                    f"Parse resolution exhausted: {entry} as {parameter.argument_types}",
+                )
                 if isinstance(
-                    handled := err(
-                        entry,
-                        ParsingError(
-                            entry,
-                            f"Parse resolution exhausted: {entry} as {parameter.argument_types}",
-                        ),
-                    ),
+                    handled := err(entry, parsing_error),
                     Exception,
                 ):
+                    if handled is parsing_error:
+                        raise parsing_error from exc
                     raise handled
                 parsed = handled
                 break
@@ -687,7 +687,7 @@ class CommandParameterParser:
     def _next_keyword_value(
         self,
         context: CommandParameterParser.Context,
-            entries: list[str],
+        entries: list[str],
         i: int,
     ) -> None:
         assert context.keyword_parameter is not None
@@ -723,7 +723,7 @@ class CommandParameterParser:
     def _next_var_kwarg_value(
         self,
         context: CommandParameterParser.Context,
-            entries: list[str],
+        entries: list[str],
         i: int,
     ) -> None:
         assert context.var_kwarg is not None
@@ -748,7 +748,7 @@ class CommandParameterParser:
 
     @staticmethod
     def _validate(
-            context: CommandParameterParser.Context,
+        context: CommandParameterParser.Context,
         parameters: list[CommandParameter],
     ) -> None:
         required_positionals: int = 0
@@ -815,9 +815,7 @@ class CommandParameterParser:
                 continue
 
             if context.var_kwarg is not None:
-                self._next_var_kwarg_value(
-                    context, entries, i
-                )
+                self._next_var_kwarg_value(context, entries, i)
                 continue
 
             if within_bypass:
