@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import Any, Optional, TYPE_CHECKING
+
 from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .cli import CLI
@@ -25,10 +26,10 @@ class TooManyArgumentsError(ParsingError):
 
 
 class CLIError(Exception):
-    def __init__(self, *args: Any, cli: Optional[CLI] = None, command: Optional[Command] = None) -> None:
+    def __init__(self, *args: Any, cli: CLI | None = None, command: Command | None = None) -> None:
         super().__init__(*args)
-        self.cli: Optional[CLI] = cli
-        self.command: Optional[Command] = command
+        self.cli: CLI | None = cli
+        self.command: Command | None = command
 
 
 class EmptyEntriesError(CLIError):
@@ -54,12 +55,12 @@ def causes(exception: BaseException, include_self: bool) -> Iterator[BaseExcepti
 
 
 __all__ = [
-    "ParsingError",
-    "MissingKeywordArgumentValueError",
-    "TooManyArgumentsError",
     "CLIError",
-    "EmptyEntriesError",
-    "CommandDoesNotExistError",
     "CommandArgumentError",
+    "CommandDoesNotExistError",
+    "EmptyEntriesError",
+    "MissingKeywordArgumentValueError",
+    "ParsingError",
+    "TooManyArgumentsError",
     "causes",
 ]

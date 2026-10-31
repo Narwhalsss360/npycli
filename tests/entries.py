@@ -20,7 +20,9 @@ def parse_bypass_with_positionals(name: str, age: int, *entries: BypassParse) ->
     print("\n".join(entries))
 
 
-def parse_bypass_with_positionals_and_kwargs(name: str, age: int, *entries: BypassParse, upper: bool = False, key: str = "value") -> None:
+def parse_bypass_with_positionals_and_kwargs(
+    name: str, age: int, *entries: BypassParse, upper: bool = False, key: str = "value"
+) -> None:
     """First give me some positionals, maybe some bool flags and some keyword arguments, but the rest, just (string) args."""
 
     name = name.upper() if upper else name
@@ -32,7 +34,14 @@ def parse_bypass_with_positionals_and_kwargs(name: str, age: int, *entries: Bypa
     print("\n".join(entries))
 
 
-def parse_bypass_with_positionals_and_kwargs_and_var_kwargs(name: str, age: int, *entries: BypassParse, upper: bool = False, key: str = "value", **kwargs: str) -> None:
+def parse_bypass_with_positionals_and_kwargs_and_var_kwargs(
+    name: str,
+    age: int,
+    *entries: BypassParse,
+    upper: bool = False,
+    key: str = "value",
+    **kwargs: str,
+) -> None:
     """First give me some positionals, maybe some bool flags and some keyword arguments, and all of the parsed keywords,
     but the rest (basically just positionals), just the (string) args."""
 
@@ -51,7 +60,7 @@ if __name__ == "__main__":
         parse_bypass,
         parse_bypass_with_positionals,
         parse_bypass_with_positionals_and_kwargs,
-        parse_bypass_with_positionals_and_kwargs_and_var_kwargs
+        parse_bypass_with_positionals_and_kwargs_and_var_kwargs,
     ):
         command: Command = Command.create(f)
         print(command.extended_command_help())

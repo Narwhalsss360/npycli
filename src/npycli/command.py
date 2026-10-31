@@ -1,26 +1,37 @@
 from __future__ import annotations
-from collections.abc import Callable
-from typing import Optional, Any, get_type_hints
-from dataclasses import dataclass, field
-from inspect import signature, Signature, getdoc
 
-from .parameters import CommandParameter, ParameterKind, CommandParameterType, parse_parameters
-from .errors import ParsingError, CommandArgumentError
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from inspect import Signature, getdoc, signature
+from typing import Any, get_type_hints
+
+from .errors import CommandArgumentError, ParsingError
+from .parameters import (
+    CommandParameter,
+    CommandParameterType,
+    ParameterKind,
+    parse_parameters,
+)
 
 
 @dataclass
 class Command:
-    __CMD_ATTR__ = '__cmd__'
-    __CMD_HOOKS_ATTR__ = '__cmd_hooks__'
+    __CMD_ATTR__ = "__cmd__"
+    __CMD_HOOKS_ATTR__ = "__cmd_hooks__"
 
     function: Callable[..., Any]
     names: tuple[str, ...]
-    help: Optional[str] = field(default=None)
-    kwarg_prefix: str = field(default_factory=lambda: '--')
+    help: str | None = field(default=None)
+    kwarg_prefix: str = field(default_factory=lambda: "--")
 
     @staticmethod
-    def create(function: Callable[..., Any], name: Optional[str] = None, names: Optional[tuple[str, ...]] = None,
-               help: Optional[str] = None, kwarg_prefix: Optional[str] = None) -> Command:
+    def create(
+        function: Callable[..., Any],
+        name: str | None = None,
+        names: tuple[str, ...] | None = None,
+        help: str | None = None,
+        kwarg_prefix: str | None = None,
+    ) -> Command:
         """
         Create a Command, wrapper for using either `name` or `names`
         :param function: Function to execute `Command` with.
@@ -33,12 +44,13 @@ class Command:
 
         if names is None:
             if name:
-                names = name,
+                names = (name,)
             else:
                 names = (function.__name__,)
 
-        return Command(function=function, names=names, help=help,
-                       kwarg_prefix=kwarg_prefix or "--")
+        return Command(
+            function=function, names=names, help=help, kwarg_prefix=kwarg_prefix or "--"
+        )
 
     @property
     def name(self) -> str:
@@ -87,7 +99,11 @@ class Command:
     def find_parameter(self, parameter_name: str) -> CommandParameter | None:
         return next(filter(lambda p: parameter_name in p.names, self._parameters), None)
 
-    def exec_with(self, entries: list[str], parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None) -> Any:
+    def exec_with(
+        self,
+        entries: list[str],
+        parsers: dict[CommandParameterType, Callable[[str], Any]] | None = None,
+    ) -> Any:
         """
         Execute this `Command` with specified arguments and parsers
         :param args: Arguments
@@ -96,30 +112,47 @@ class Command:
         """
 
         try:
-            args, kwargs = parse_parameters(self._parameters, entries, self.kwarg_prefix, self.kwarg_prefix, parsers or {})
+            args, kwargs = parse_parameters(
+                self._parameters,
+                entries,
+                self.kwarg_prefix,
+                self.kwarg_prefix,
+                parsers or {},
+            )
             return self.function(*args, **kwargs)
         except TypeError as type_error:
             if self._is_argument_error(type_error):
-                raise CommandArgumentError(*type_error.args, command=self) from type_error
+                raise CommandArgumentError(
+                    *type_error.args, command=self
+                ) from type_error
             raise
         except ParsingError as parsing_error:
-            raise CommandArgumentError(*parsing_error.args, command=self) from parsing_error
+            raise CommandArgumentError(
+                *parsing_error.args, command=self
+            ) from parsing_error
 
     def _validate_data(self) -> None:
         if not callable(self.function):
-            raise TypeError(f'{Command._validate_data} -> {self.function} is not callable.')
-        if not isinstance(self.names, tuple) or not all(isinstance(name, str) for name in self.names):  # type: ignore
-            raise TypeError(f'{Command} names must be a {tuple} of {str}.')
+            raise TypeError(
+                f"{Command._validate_data} -> {self.function} is not callable."
+            )
+        if not isinstance(self.names, tuple) or not all(  # pyright: ignore[reportUnnecessaryIsInstance]
+            isinstance(name, str)  # pyright: ignore[reportUnnecessaryIsInstance]
+            for name in self.names
+        ):
+            raise TypeError(f"{Command} names must be a {tuple} of {str}.")
         if not self.names:
-            raise ValueError(f'{Command} names must not be empty.')
+            raise ValueError(f"{Command} names must not be empty.")
         for name in self.names:
             for c in name:
                 if c.isspace():
-                    raise ValueError(f'Name for {self.function} cannot contain whitespace: {name}')
+                    raise ValueError(
+                        f"Name for {self.function} cannot contain whitespace: {name}"
+                    )
         if getattr(self.function, Command.__CMD_ATTR__, None) is not None:
-            raise TypeError(f'Function {self.function} is already a {Command}.')
-        if self.help is not None and not isinstance(self.help, str):  # type: ignore
-            raise TypeError(f'{Command} help must be a {str}.')
+            raise TypeError(f"Function {self.function} is already a {Command}.")
+        if self.help is not None and not isinstance(self.help, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+            raise TypeError(f"{Command} help must be a {str}.")
 
     def _attach_self(self) -> None:
         assert not hasattr(self.function, Command.__CMD_ATTR__)
@@ -132,7 +165,9 @@ class Command:
         self._signature: Signature = signature(self.function)
         annotations: dict[str, Any] = get_type_hints(self.function, include_extras=True)
         self._parameters: list[CommandParameter] = [
-            CommandParameter.build(p.name, p.kind, annotations.get(p.name, str), default=p.default)
+            CommandParameter.build(
+                p.name, p.kind, annotations.get(p.name, str), default=p.default
+            )
             for p in self._signature.parameters.values()
         ]
 
@@ -155,7 +190,7 @@ class Command:
         self._callback_futures()
 
     def _is_argument_error(self, type_error: TypeError) -> bool:
-        return type_error.args[0].startswith(f'{self.function.__name__}(')
+        return type_error.args[0].startswith(f"{self.function.__name__}(")
 
     def basic_command_help(self) -> str:
         out: str = f"{self.name} "
@@ -197,7 +232,11 @@ class Command:
 
         return out
 
-    def __call__(self, args: list[str] | None = None, parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None) -> Any:
+    def __call__(
+        self,
+        args: list[str] | None = None,
+        parsers: dict[CommandParameterType, Callable[[str], Any]] | None = None,
+    ) -> Any:
         return self.exec_with(args or [], parsers)
 
     def __str__(self) -> str:
@@ -216,16 +255,12 @@ def cmd(function: Callable[..., Any]) -> Command:
 
 def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) -> None:
     if is_cmd(function):
-        raise \
-            TypeError(f'function {function} is already not a future command, it is already a command: {cmd(function)}')
+        raise TypeError(
+            f"function {function} is already not a future command, it is already a command: {cmd(function)}"
+        )
     if not hasattr(function, Command.__CMD_HOOKS_ATTR__):
         setattr(function, Command.__CMD_HOOKS_ATTR__, [])
     getattr(function, Command.__CMD_HOOKS_ATTR__).append(callback)
 
 
-__all__ = [
-    "Command",
-    "is_cmd",
-    "cmd",
-    "cmd_hook"
-]
+__all__ = ["Command", "cmd", "cmd_hook", "is_cmd"]

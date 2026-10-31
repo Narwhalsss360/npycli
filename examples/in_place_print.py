@@ -27,13 +27,15 @@ def wrap_and_pad_lines(string: str, columns: int) -> str:
             this, next = lines[i][:columns], lines[i][columns:]
             lines[i] = this
             lines.insert(i + 1, next)
-        lines[i] = f"{lines[i].ljust(columns)}{"" if i == len(lines) - 1 else "\n"}"
+        lines[i] = f"{lines[i].ljust(columns)}{'' if i == len(lines) - 1 else '\n'}"
     return "".join(lines)
 
 
 type TerminalColumnsType = int
 type TerminalLinesType = int
-type TerminalSizeGetterType = Callable[[], tuple[TerminalColumnsType, TerminalLinesType]]
+type TerminalSizeGetterType = Callable[
+    [], tuple[TerminalColumnsType, TerminalLinesType]
+]
 
 
 class InPlacePrint:
@@ -76,9 +78,13 @@ class InPlacePrint:
         if self.last_lines is not None:
             if len(self.last_lines) > len(lines):
                 clearing_line: str = " " * terminal_size.columns
-                with_clearing.extend(clearing_line for _ in range(len(self.last_lines) - len(lines)))
+                with_clearing.extend(
+                    clearing_line for _ in range(len(self.last_lines) - len(lines))
+                )
 
-            padding: list[int] = [len(strip_control_sequences(last_line)) for last_line in self.last_lines]
+            padding: list[int] = [
+                len(strip_control_sequences(last_line)) for last_line in self.last_lines
+            ]
             if len(padding) < len(with_clearing):
                 padding.extend(0 for _ in range(len(lines) - len(padding)))
             with_clearing = InPlacePrint.pad(with_clearing, padding)
@@ -116,7 +122,10 @@ class InPlacePrint:
             return False
 
         clearing_line: str = " " * terminal_size.columns
-        print("\n".join([clearing_line for _ in range(len(self.last_lines))]), file=self._file)
+        print(
+            "\n".join([clearing_line for _ in range(len(self.last_lines))]),
+            file=self._file,
+        )
         CUU(len(self.last_lines), file=self._file)
         return True
 
@@ -135,7 +144,9 @@ class InPlacePrint:
         return self.print(*values, sep=sep, end=end)
 
 
-def bouncer(min: int, max: int, increasing: bool, max_iterations: int) -> Generator[int, Any, None]:
+def bouncer(
+    min: int, max: int, increasing: bool, max_iterations: int
+) -> Generator[int, Any, None]:
     assert min <= max
     i: int = 0
     n: int = min - 1 if increasing else max + 1
@@ -166,7 +177,7 @@ def main(
     direction: Direction = "increasing",
     max_iterations: int = 100,
     sleep_interval: float = 0.25,
-    bounce_object: BounceObject = "ball"
+    bounce_object: BounceObject = "ball",
 ) -> None:
     in_place_print: InPlacePrint = InPlacePrint()
     if bounce_object == "ball" and min != 0:
@@ -180,15 +191,21 @@ def main(
     P_RM(HIDE_CURSOR, file=stdout)
     try:
         for n in bouncer(min, max, direction == "increasing", max_iterations):
-            bounce_message_lines: list[str] = [strip_control_sequences(line) for line in bounce_message.splitlines()]
-            separator_width: int = len("  Bounce: 1") if len(bounce_message) == 0 else builtins.max(len(line) for line in bounce_message_lines)
+            bounce_message_lines: list[str] = [
+                strip_control_sequences(line) for line in bounce_message.splitlines()
+            ]
+            separator_width: int = (
+                len("  Bounce: 1")
+                if len(bounce_message) == 0
+                else builtins.max(len(line) for line in bounce_message_lines)
+            )
             if bounce_object == "numbers":
-                s: str = f"{"\u2500" * separator_width}\n{"\n".join(str(i + bounces) for i in range(n))}"
+                s: str = f"{'\u2500' * separator_width}\n{'\n'.join(str(i + bounces) for i in range(n))}"
             else:
                 s: str = (
-                    f"{"\u2500" * separator_width}\n"
-                    f"{"\n" * (max - n)}{" " * (separator_width // 2)}*{n * "\n"}"
-                    f"\n{"\u2500" * separator_width}"
+                    f"{'\u2500' * separator_width}\n"
+                    f"{'\n' * (max - n)}{' ' * (separator_width // 2)}*{n * '\n'}"
+                    f"\n{'\u2500' * separator_width}"
                 )
             in_place_print(s, end="")
             if n == min:
@@ -207,10 +224,13 @@ def main(
 
 if __name__ == "__main__":
     try:
-        Command.create(main).exec_with(argv[1:], {
-            Direction: create_literal_parser(Direction),
-            BounceObject: create_literal_parser(BounceObject)
-        })
+        Command.create(main).exec_with(
+            argv[1:],
+            {
+                Direction: create_literal_parser(Direction),
+                BounceObject: create_literal_parser(BounceObject),
+            },
+        )
     except ValueError as e:
         print(
             SGR(BOLD_OR_INCREASED_INTENSITY, RED_BACKGROUND, WHITE_DISPLAY),
@@ -219,5 +239,5 @@ if __name__ == "__main__":
             f": {e}",
             sep="",
             end="",
-            file=stderr
+            file=stderr,
         )

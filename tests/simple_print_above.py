@@ -34,7 +34,12 @@ def input_async_process_target(queue: Queue[str]) -> None:
 async def input_async(prompt: object = None) -> str:
     user_input_queue: Queue[str] = Queue(1)
 
-    proc: Process = Process(target=input_async_process_target, args=(user_input_queue,), name="server:input", daemon=True)
+    proc: Process = Process(
+        target=input_async_process_target,
+        args=(user_input_queue,),
+        name="server:input",
+        daemon=True,
+    )
     print(prompt, end="", flush=True)
     proc.start()
     assert proc.pid is not None
@@ -53,10 +58,17 @@ async def input_async(prompt: object = None) -> str:
     return user_input_queue.get()
 
 
-def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextIO = stdout, current_is_empty: bool = False, lines_above: int = 1) -> None:
-    '''
+def print_above(
+    *args: Any,
+    max_columns: int,
+    sep: str | None = " ",
+    file: TextIO = stdout,
+    current_is_empty: bool = False,
+    lines_above: int = 1,
+) -> None:
+    """
     Print above the current line.
-    '''
+    """
 
     if lines_above == 0:
         print(*args, sep=sep)
@@ -86,7 +98,7 @@ def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextI
     IL(line_count, file=file)
 
     # Flush, just in case current cursor position gets moved after output
-    print(output, end='', file=file, flush=True)
+    print(output, end="", file=file, flush=True)
     RCP(file=file)
     CUD(line_count, file=file)
 
@@ -107,8 +119,12 @@ async def main() -> None:
     P_SM(SHOW_CURSOR, file=stdout)
     while True:
         sleep_task: Task[None] = create_task(sleep(0.4))
-        def canceller(input_task: Task[str], sleep_task: Task[None] = sleep_task) -> None:
+
+        def canceller(
+            input_task: Task[str], sleep_task: Task[None] = sleep_task
+        ) -> None:
             sleep_task.cancel()
+
         input_task.add_done_callback(canceller)
         try:
             await sleep_task
@@ -116,7 +132,10 @@ async def main() -> None:
             if not input_task.done():
                 input_task.cancel()
             break
-        print_above(f"Printed Above\n{SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY)}Iteration: {i}{SGR(DEFAULT_RENDITION)}", max_columns=get_terminal_size().columns)
+        print_above(
+            f"Printed Above\n{SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY)}Iteration: {i}{SGR(DEFAULT_RENDITION)}",
+            max_columns=get_terminal_size().columns,
+        )
         i += 1
 
     if input_task.done():

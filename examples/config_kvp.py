@@ -8,14 +8,18 @@ from npycli import AnnotationPreview, Command, ParsingError
 class GenericConfigKVP:
     def __init__(self, arg: str, delimiter: str | None = None) -> None:
         if delimiter is None:
-            raise TypeError("This must be a base class, where the 'delimiter' argument is specified")
+            raise TypeError(
+                "This must be a base class, where the 'delimiter' argument is specified"
+            )
         if delimiter not in arg:
-            raise ParsingError(f"{GenericConfigKVP.__name__}({delimiter!r}): Argument does not have delimiter.")
+            raise ParsingError(
+                f"{GenericConfigKVP.__name__}({delimiter!r}): Argument does not have delimiter."
+            )
         index = arg.index(delimiter)
 
         self.delimiter: str = delimiter
         self.key: str = arg[:index]
-        self.value: str = arg[index + len(delimiter):]
+        self.value: str = arg[index + len(delimiter) :]
         self.arg: str = arg
 
     def __iter__(self) -> Iterator[str]:
@@ -30,18 +34,21 @@ class GenericConfigKVP:
 
 class EqualsConfigKVP(GenericConfigKVP):
     DELIMITER = "="
+
     def __init__(self, arg: str) -> None:
         super().__init__(arg, EqualsConfigKVP.DELIMITER)
 
 
 class ColonConfigKVP(GenericConfigKVP):
     DELIMITER = ":"
+
     def __init__(self, arg: str) -> None:
         super().__init__(arg, ColonConfigKVP.DELIMITER)
 
 
 class WalrusConfigKVP(GenericConfigKVP):
     DELIMITER = ":="
+
     def __init__(self, arg: str) -> None:
         super().__init__(arg, WalrusConfigKVP.DELIMITER)
 
@@ -49,7 +56,11 @@ class WalrusConfigKVP(GenericConfigKVP):
 ConfigKVP = WalrusConfigKVP
 
 
-def config_values(*args: Annotated[ConfigKVP, AnnotationPreview(f"ConfigKVP(key{ConfigKVP.DELIMITER}value)")]) -> None:
+def config_values(
+    *args: Annotated[
+        ConfigKVP, AnnotationPreview(f"ConfigKVP(key{ConfigKVP.DELIMITER}value)")
+    ],
+) -> None:
     cfg = dict(cast(Iterable[tuple[str, str]], args))
     print(cfg)
 

@@ -3,7 +3,11 @@ from os.path import basename
 from sys import argv, exit, stderr
 from typing import Annotated
 
-from aiohttp import ClientError, ClientResponseError, ClientSession
+try:
+    from aiohttp import ClientError, ClientResponseError, ClientSession
+except ImportError:
+    print("Module aiohttp is required for this example", file=stderr)
+    exit(1)
 
 from npycli import Command, command
 from npycli.ansi.const.sgr import (
@@ -26,7 +30,8 @@ def print_error(e: Exception) -> None:
         SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY),
         f"{e.__class__.__name__}:",
         SGR(DEFAULT_RENDITION),
-        " ", message,
+        " ",
+        message,
         sep="",
         file=stderr,
     )

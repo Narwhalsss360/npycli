@@ -1,11 +1,20 @@
 from __future__ import annotations
-from types import NoneType, UnionType, GenericAlias
-from collections.abc import Callable
-from typing import Any, Annotated, Type, Union, TypeAliasType, get_origin, get_args, Literal
-from inspect import _ParameterKind, Parameter  # type: ignore
-from dataclasses import dataclass, field
-from .errors import ParsingError, MissingKeywordArgumentValueError
 
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from inspect import Parameter, _ParameterKind  # type: ignore
+from types import GenericAlias, NoneType, UnionType
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    TypeAliasType,
+    Union,
+    get_args,
+    get_origin,
+)
+
+from .errors import MissingKeywordArgumentValueError, ParsingError
 
 ParameterKind = _ParameterKind
 
@@ -60,7 +69,7 @@ class ParseHooks:
         self,
         pre: Callable[[str], str] | None = None,
         post: Callable[[Any], Any] | None = None,
-        err: Callable[[str, Exception], Any | Exception] | None = None
+        err: Callable[[str, Exception], Any | Exception] | None = None,
     ) -> None:
         self.pre: Callable[[str], str] | None = pre
         self.post: Callable[[Any], Any] | None = post
@@ -80,13 +89,13 @@ class CustomAttrbute:
         self.overwrite: bool = overwrite
 
     def __repr__(self) -> str:
-        return f"ParseHooks({self.key}, {repr(self.value)}, {self.overwrite})"
+        return f"ParseHooks({self.key}, {self.value!r}, {self.overwrite})"
 
     def __str__(self) -> str:
         return repr(self)
 
 
-ContainerTypes = (list[Any] | tuple[Any, ...])
+ContainerTypes = list[Any] | tuple[Any, ...]
 CONTAINER_TYPES: tuple[type, ...] = list, tuple
 
 
@@ -120,7 +129,9 @@ class CommandParameter:
         self._validate_data()
 
     @staticmethod
-    def build(name: str, kind: ParameterKind, annotation: Any, default: Any = empty) -> CommandParameter:
+    def build(
+        name: str, kind: ParameterKind, annotation: Any, default: Any = empty
+    ) -> CommandParameter:
         return CommandParameterBuilder(name, kind, annotation, default).parameter
 
     @property
@@ -135,11 +146,11 @@ class CommandParameter:
     @property
     def is_plain(self) -> bool:
         return (
-            self.annotation_preview is CommandParameter.DEFAULT_STR and
-            self.argument_types is CommandParameter.DEFAULT_ARG_TYPES and
-            self.default_preview is CommandParameter.DEFAULT_STR and
-            self.description is CommandParameter.DEFAULT_STR and
-            self.parse_hooks is None
+            self.annotation_preview is CommandParameter.DEFAULT_STR
+            and self.argument_types is CommandParameter.DEFAULT_ARG_TYPES
+            and self.default_preview is CommandParameter.DEFAULT_STR
+            and self.description is CommandParameter.DEFAULT_STR
+            and self.parse_hooks is None
         )
 
     @property
@@ -151,7 +162,7 @@ class CommandParameter:
         return self.argument_types[0]
 
     @property
-    def container_type(self) -> Type[ContainerTypes] | None:
+    def container_type(self) -> type[ContainerTypes] | None:
         if self._container_annotation is None:
             return None
         return get_origin(self._container_annotation)
@@ -161,14 +172,18 @@ class CommandParameter:
         if self._container_annotation is None:
             return None
         if not (args := get_args(self._container_annotation)):
-            return (str, )
+            return (str,)
 
         if get_origin(self._container_annotation) is tuple:
             if len(args) != 2 or args[1] is not Ellipsis:
-                raise TypeError("Ellipsis required for second generic argument of tuples")
+                raise TypeError(
+                    "Ellipsis required for second generic argument of tuples"
+                )
             args = (args[0],)
         elif len(args) != 1:
-            raise TypeError("Only single argument generic container types are supported")
+            raise TypeError(
+                "Only single argument generic container types are supported"
+            )
 
         if isinstance(args[0], UnionType) or args[0] == Union:
             return get_args(args[0])
@@ -178,7 +193,9 @@ class CommandParameter:
     def bypasses_parsing(self) -> bool:
         return len(self.argument_types) == 1 and self.argument_types[0] is BypassParse
 
-    def add_custom_attribute(self, key: str, value: Any, overwrite: bool = False) -> None:
+    def add_custom_attribute(
+        self, key: str, value: Any, overwrite: bool = False
+    ) -> None:
         if not overwrite and key in self._custom_attributes:
             raise KeyError(f"Key {key} already exists and overwrite is False")
         self._custom_attributes[key] = value
@@ -188,7 +205,7 @@ class CommandParameter:
         if t == NoneType:
             return str(None)
         if get_origin(t) == Literal:
-            return f"Literal[{", ".join(repr(arg) for arg in get_args(t))}]"
+            return f"Literal[{', '.join(repr(arg) for arg in get_args(t))}]"
         return t.__name__
 
     def annotation_preview_fallback(self) -> str:
@@ -200,9 +217,14 @@ class CommandParameter:
             if t in CONTAINER_TYPES:
                 item_types: tuple[CommandParameterType, ...] | None = self.item_types
                 assert item_types is not None
-                out += f"[{' | '.join([
-                    CommandParameter.type_name(item_type) for item_type in item_types
-                ])}{', ...' if t is tuple else ''}]"
+                out += f"[{
+                    ' | '.join(
+                        [
+                            CommandParameter.type_name(item_type)
+                            for item_type in item_types
+                        ]
+                    )
+                }{', ...' if t is tuple else ''}]"
             if i != len(self.argument_types) - 1:
                 out += " | "
         return out
@@ -216,9 +238,10 @@ class CommandParameter:
 
     def basic_parameter_help(self) -> str:
         if (
-            self.default != self.empty and
-            self.argument_types[0] is bool and
-            self.kind in (ParameterKind.POSITIONAL_OR_KEYWORD, ParameterKind.KEYWORD_ONLY)
+            self.default != self.empty
+            and self.argument_types[0] is bool
+            and self.kind
+            in (ParameterKind.POSITIONAL_OR_KEYWORD, ParameterKind.KEYWORD_ONLY)
         ):
             return f"[{self.name}]"
         else:
@@ -251,9 +274,14 @@ class CommandParameter:
             if t in CONTAINER_TYPES:
                 item_types: tuple[CommandParameterType, ...] | None = self.item_types
                 assert item_types is not None
-                out += f"[{' | '.join([
-                    CommandParameter.type_name(item_type) for item_type in item_types
-                ])}{', ...' if t is tuple else ''}]"
+                out += f"[{
+                    ' | '.join(
+                        [
+                            CommandParameter.type_name(item_type)
+                            for item_type in item_types
+                        ]
+                    )
+                }{', ...' if t is tuple else ''}]"
             if i != len(self.argument_types) - 1:
                 out += "\n"
 
@@ -285,23 +313,34 @@ class CommandParameter:
 class CommandParameterBuilder:
     DEFAULT_NAMES: tuple[str] = ("",)
 
-    def __init__(self, name: str, kind: ParameterKind, annotation: Any, default: Any = CommandParameter.empty) -> None:
+    def __init__(
+        self,
+        name: str,
+        kind: ParameterKind,
+        annotation: Any,
+        default: Any = CommandParameter.empty,
+    ) -> None:
         if isinstance(annotation, str):
-            raise ValueError("'annotation' must not be the source code annotation string.")
+            raise TypeError(
+                "'annotation' must not be the source code annotation string."
+            )
 
         self._name: str = name
         self._kind: ParameterKind = kind
         self._default: Any = default
-        self._parameter: CommandParameter = CommandParameter(CommandParameterBuilder.DEFAULT_NAMES, kind, annotation, default=default)
+        self._parameter: CommandParameter = CommandParameter(
+            CommandParameterBuilder.DEFAULT_NAMES, kind, annotation, default=default
+        )
         self._has_bypass: bool = False
         self._appending_mode: bool = False
         self._built: bool = False
 
-
         if annotation is CommandParameter.empty:
             self._parameter.names = (name,)
-            pass
-        elif isinstance(annotation, TypeAliasType) and get_origin(annotation.__value__) is Annotated:
+        elif (
+            isinstance(annotation, TypeAliasType)
+            and get_origin(annotation.__value__) is Annotated
+        ):
             args: tuple[Any, ...] = get_args(annotation.__value__)
             self._next_annotation(args[0])
             for arg in args[1:]:
@@ -316,7 +355,9 @@ class CommandParameterBuilder:
 
     def _next_metadata_annotation(self, annotation: Any) -> None:
         if isinstance(annotation, Alias):
-            self._parameter.names = (() if annotation.private else (self._name,)) + annotation.aliases
+            self._parameter.names = (
+                () if annotation.private else (self._name,)
+            ) + annotation.aliases
             self._parameter._private_name = self._name  # pyright: ignore [reportPrivateUsage]
         elif isinstance(annotation, Description):
             self._parameter.description = annotation.description
@@ -327,19 +368,28 @@ class CommandParameterBuilder:
         elif isinstance(annotation, ParseHooks):
             self._parameter.parse_hooks = annotation
         elif isinstance(annotation, CustomAttrbute):
-            self._parameter.add_custom_attribute(annotation.key, annotation.value, annotation.overwrite)
+            self._parameter.add_custom_attribute(
+                annotation.key, annotation.value, annotation.overwrite
+            )
         else:
             raise TypeError(f"{annotation} is unsupported")
 
     def _next_annotation(self, annotation: Any) -> None:
         if self._has_bypass:
-            raise TypeError(f"The only self._parameter.must be {BypassParse.__name__} when it is specified")
+            raise TypeError(
+                f"The only self._parameter.must be {BypassParse.__name__} when it is specified"
+            )
 
         if isinstance(annotation, type):
-            if not self._appending_mode or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+            if (
+                not self._appending_mode
+                or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES
+            ):
                 self._parameter.argument_types = (annotation,)
             else:
-                self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+                self._parameter.argument_types = self._parameter.argument_types + (
+                    annotation,
+                )
             return
 
         if isinstance(annotation, TypeAliasType):
@@ -347,15 +397,28 @@ class CommandParameterBuilder:
             return
 
         if (origin := get_origin(annotation)) in CONTAINER_TYPES:
-            if self._kind not in (self._parameter.kind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
-                raise TypeError(f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}")
+            if self._kind not in (
+                self._parameter.kind.KEYWORD_ONLY,
+                ParameterKind.VAR_KEYWORD,
+            ):
+                raise TypeError(
+                    f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}"
+                )
             self._parameter.argument_types = (origin,)
             self._parameter._container_annotation = annotation  # pyright: ignore [reportPrivateUsage]
-            item_types: tuple[CommandParameterType, ...] | None = self._parameter.item_types
-            assert item_types is not None, "Shall not be None of _container_annotation is not None"
+            item_types: tuple[CommandParameterType, ...] | None = (
+                self._parameter.item_types
+            )
+            assert item_types is not None, (
+                "Shall not be None of _container_annotation is not None"
+            )
 
-            if not all(isinstance(item_type, (type, TypeAliasType)) for item_type in item_types):
-                raise TypeError(f"{item_types} is not supported as item types for containers, only {CommandParameterType}.")
+            if not all(
+                isinstance(item_type, (type, TypeAliasType)) for item_type in item_types
+            ):
+                raise TypeError(
+                    f"{item_types} is not supported as item types for containers, only {CommandParameterType}."
+                )
             return
 
         if isinstance(annotation, GenericAlias):
@@ -365,17 +428,25 @@ class CommandParameterBuilder:
         if isinstance(annotation, UnionType) or get_origin(annotation) == Union:
             args = get_args(annotation)
             for arg in args:
-                if not isinstance(arg, (type, TypeAliasType)) and get_origin(arg) not in CONTAINER_TYPES:
+                if (
+                    not isinstance(arg, (type, TypeAliasType))
+                    and get_origin(arg) not in CONTAINER_TYPES
+                ):
                     continue
                 self._appending_mode = True
                 self._next_annotation(arg)
             return
 
         if get_origin(annotation) == Literal:
-            if not self._appending_mode or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
+            if (
+                not self._appending_mode
+                or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES
+            ):
                 self._parameter.argument_types = (annotation,)
             else:
-                self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+                self._parameter.argument_types = self._parameter.argument_types + (
+                    annotation,
+                )
             return
 
         raise TypeError(f"{annotation} is unsupported")
@@ -383,9 +454,13 @@ class CommandParameterBuilder:
     def _next_type_alias(self, annotation: TypeAliasType) -> None:
         if annotation is BypassParse:
             if self._kind != self._parameter.kind.VAR_POSITIONAL:
-                raise TypeError(f"{BypassParse.__name__} self._parameter.kind must be VAR_POSITIONAL")
+                raise TypeError(
+                    f"{BypassParse.__name__} self._parameter.kind must be VAR_POSITIONAL"
+                )
             if self._default is not self._parameter.empty:
-                raise TypeError(f"{BypassParse.__name__} self._parameter.must be empty, it will always be provided.")
+                raise TypeError(
+                    f"{BypassParse.__name__} self._parameter.must be empty, it will always be provided."
+                )
             self._has_bypass = True
             self._parameter.argument_types = (BypassParse,)
             return
@@ -393,7 +468,9 @@ class CommandParameterBuilder:
         if self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
             self._parameter.argument_types = (annotation,)
         else:
-            self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+            self._parameter.argument_types = self._parameter.argument_types + (
+                annotation,
+            )
 
         self._appending_mode = True
         self._next_annotation(annotation.__value__)
@@ -402,7 +479,9 @@ class CommandParameterBuilder:
         if self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
             self._parameter.argument_types = (annotation,)
         else:
-            self._parameter.argument_types = self._parameter.argument_types + (annotation,)
+            self._parameter.argument_types = self._parameter.argument_types + (
+                annotation,
+            )
 
     @property
     def parameter(self) -> CommandParameter:
@@ -429,7 +508,11 @@ def default_err_parse_hook(_: str, exc: Exception) -> Any | Exception:
     return exc
 
 
-def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[CommandParameterType, Callable[[str], Any]]) -> Any:
+def parse_with_hooks(
+    parameter: CommandParameter,
+    entry: str,
+    parsers: dict[CommandParameterType, Callable[[str], Any]],
+) -> Any:
     pre: Callable[[str], str] = default_pre_parse_hook
     post: Callable[[Any], Any] = default_post_parse_hook
     err: Callable[[str, Exception], Any | Exception] = default_err_parse_hook
@@ -441,7 +524,10 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
     parsed: Any = CommandParameter.UNPARSED
     entry = pre(entry)
     for ith_type, parameter_type in enumerate(parameter.argument_types):
-        if parameter_type in CONTAINER_TYPES and (item_types := parameter.item_types) is not None:
+        if (
+            parameter_type in CONTAINER_TYPES
+            and (item_types := parameter.item_types) is not None
+        ):
             inner_types: tuple[CommandParameterType, ...] = item_types
         else:
             inner_types: tuple[CommandParameterType, ...] = (parameter_type,)
@@ -461,12 +547,21 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
                 if not isinstance(handled := err(entry, exc), Exception):
                     parsed = handled
                     break
-                if ith_type != len(parameter.argument_types) - 1 or ith_inner_type != len(inner_types) - 1:
+                if (
+                    ith_type != len(parameter.argument_types) - 1
+                    or ith_inner_type != len(inner_types) - 1
+                ):
                     continue
 
                 if isinstance(
-                    handled := err(entry, ParsingError(entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}")),
-                    Exception
+                    handled := err(
+                        entry,
+                        ParsingError(
+                            entry,
+                            f"Parse resolution exhausted: {entry} as {parameter.argument_types}",
+                        ),
+                    ),
+                    Exception,
                 ):
                     raise handled
                 parsed = handled
@@ -476,12 +571,16 @@ def parse_with_hooks(parameter: CommandParameter, entry: str, parsers: dict[Comm
             break
 
     if parsed is CommandParameter.UNPARSED:
-        raise ParsingError(entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}")
+        raise ParsingError(
+            entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}"
+        )
 
     return post(parsed)
 
 
-def add_to_container_type(container_type: Type[ContainerTypes], current: ContainerTypes | None, parsed: Any) -> ContainerTypes:
+def add_to_container_type(
+    container_type: type[ContainerTypes], current: ContainerTypes | None, parsed: Any
+) -> ContainerTypes:
     if container_type is list:
         if current is None:
             return [parsed]
@@ -502,39 +601,74 @@ class CommandParameterParser:
         def __init__(self, parameters: list[CommandParameter]) -> None:
             self.arguments: list[Any] = []
             self.keyword_arguments: dict[str, Any] = {}
-            self.var_args: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_POSITIONAL, parameters), None)
-            self.var_args_index: int = -1 if self.var_args is None else parameters.index(self.var_args)
-            self.var_kwargs: CommandParameter | None = next(filter(lambda p: p.kind == ParameterKind.VAR_KEYWORD, parameters), None)
+            self.var_args: CommandParameter | None = next(
+                filter(lambda p: p.kind == ParameterKind.VAR_POSITIONAL, parameters),
+                None,
+            )
+            self.var_args_index: int = (
+                -1 if self.var_args is None else parameters.index(self.var_args)
+            )
+            self.var_kwargs: CommandParameter | None = next(
+                filter(lambda p: p.kind == ParameterKind.VAR_KEYWORD, parameters), None
+            )
             self.keyword_parameter: CommandParameter | None = None
             self.var_kwarg: str | None = None
             self.no_keywords: bool = False
 
-    def __init__(self, keyword_prefix: str, argument_separator: str, parsers: dict[CommandParameterType, Callable[[str], Any]]) -> None:
+    def __init__(
+        self,
+        keyword_prefix: str,
+        argument_separator: str,
+        parsers: dict[CommandParameterType, Callable[[str], Any]],
+    ) -> None:
         self.keyword_prefix: str = keyword_prefix
         self.argument_separator: str = argument_separator
         self.parsers: dict[CommandParameterType, Callable[[str], Any]] = parsers
 
-    def _next_keyword(self, context: CommandParameterParser.Context, parameters: list[CommandParameter], bypass_parse: bool, entries: list[str], i: int) -> None:
+    def _next_keyword(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: list[CommandParameter],
+        bypass_parse: bool,
+        entries: list[str],
+        i: int,
+    ) -> None:
         entry: str = entries[i]
         if context.keyword_parameter is not None:
             assert isinstance(context.keyword_parameter, CommandParameter)
-            raise MissingKeywordArgumentValueError(context.keyword_parameter.name, f"'{context.keyword_parameter.name}' is missing a value")
+            raise MissingKeywordArgumentValueError(
+                context.keyword_parameter.name,
+                f"'{context.keyword_parameter.name}' is missing a value",
+            )
         if context.var_kwarg is not None:
-            assert context.var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+            assert context.var_kwargs is not None, (
+                "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+            )
             if bool in context.var_kwargs.argument_types:
                 context.keyword_arguments[context.var_kwarg] = True
             else:
-                raise MissingKeywordArgumentValueError(f"'{context.var_kwarg}' is missing a value")
+                raise MissingKeywordArgumentValueError(
+                    f"'{context.var_kwarg}' is missing a value"
+                )
 
-        keyword = entry[len(self.keyword_prefix):]
-        context.keyword_parameter = next(filter(lambda p: keyword in p.names, parameters), None)
+        keyword = entry[len(self.keyword_prefix) :]
+        context.keyword_parameter = next(
+            filter(lambda p: keyword in p.names, parameters), None
+        )
         if context.keyword_parameter is not None:  # type: ignore
             context.keyword_parameter = context.keyword_parameter
             if context.keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
-                raise ParsingError(context.keyword_parameter.name, "This argument is positional only")
-            elif context.keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
-                if parameters.index(context.keyword_parameter) < len(context.arguments):
-                    raise ParsingError(context.keyword_parameter.name, f"'{context.keyword_parameter.name}' was already specified positionally")
+                raise ParsingError(
+                    context.keyword_parameter.name, "This argument is positional only"
+                )
+            elif (
+                context.keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD
+                and parameters.index(context.keyword_parameter) < len(context.arguments)
+            ):
+                raise ParsingError(
+                    context.keyword_parameter.name,
+                    f"'{context.keyword_parameter.name}' was already specified positionally",
+                )
 
             if context.keyword_parameter.argument_types[0] is bool:  # Boolean flag
                 context.keyword_arguments[context.keyword_parameter.private_name] = True
@@ -550,29 +684,56 @@ class CommandParameterParser:
             else:
                 raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
 
-    def _next_keyword_value(self, context: CommandParameterParser.Context, parameters: list[CommandParameter], bypass_parse: bool, entries: list[str], i: int) -> None:
+    def _next_keyword_value(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: list[CommandParameter],
+        bypass_parse: bool,
+        entries: list[str],
+        i: int,
+    ) -> None:
         assert context.keyword_parameter is not None
         assert isinstance(context.keyword_parameter, CommandParameter)
 
         entry: str = entries[i]
         if (container_type := context.keyword_parameter.container_type) is not None:
-            context.keyword_arguments[context.keyword_parameter.private_name] = add_to_container_type(
-                container_type,
-                context.keyword_arguments.get(context.keyword_parameter.private_name, None),
-                parse_with_hooks(context.keyword_parameter, entry, self.parsers)
+            context.keyword_arguments[context.keyword_parameter.private_name] = (
+                add_to_container_type(
+                    container_type,
+                    context.keyword_arguments.get(
+                        context.keyword_parameter.private_name, None
+                    ),
+                    parse_with_hooks(context.keyword_parameter, entry, self.parsers),
+                )
             )
         elif context.keyword_parameter.kind == ParameterKind.VAR_POSITIONAL:
             if len(context.arguments) <= context.var_args_index:
-                raise ParsingError(entry, "Cannot provide variable positional argument before positional-only and positional-or-keyword parameters.")
-            context.arguments.append(parse_with_hooks(context.keyword_parameter, entry, self.parsers))
+                raise ParsingError(
+                    entry,
+                    "Cannot provide variable positional argument before positional-only and positional-or-keyword parameters.",
+                )
+            context.arguments.append(
+                parse_with_hooks(context.keyword_parameter, entry, self.parsers)
+            )
         else:
-            context.keyword_arguments[context.keyword_parameter.private_name] = parse_with_hooks(context.keyword_parameter, entry, self.parsers)
+            context.keyword_arguments[context.keyword_parameter.private_name] = (
+                parse_with_hooks(context.keyword_parameter, entry, self.parsers)
+            )
 
         context.keyword_parameter = None
 
-    def _next_var_kwarg_value(self, context: CommandParameterParser.Context, parameters: list[CommandParameter], bypass_parse: bool, entries: list[str], i: int) -> None:
+    def _next_var_kwarg_value(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: list[CommandParameter],
+        bypass_parse: bool,
+        entries: list[str],
+        i: int,
+    ) -> None:
         assert context.var_kwarg is not None
-        assert context.var_kwargs is not None, "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+        assert context.var_kwargs is not None, (
+            "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+        )
 
         entry: str = entries[i]
         if (container_type := context.var_kwargs.container_type) is not None:
@@ -581,18 +742,27 @@ class CommandParameterParser:
             context.keyword_arguments[context.var_kwarg] = add_to_container_type(
                 container_type,
                 context.keyword_arguments[context.var_kwarg],
-                parse_with_hooks(context.var_kwargs, entry, self.parsers)
+                parse_with_hooks(context.var_kwargs, entry, self.parsers),
             )
         else:
-            context.keyword_arguments[context.var_kwarg] = parse_with_hooks(context.var_kwargs, entry, self.parsers)
+            context.keyword_arguments[context.var_kwarg] = parse_with_hooks(
+                context.var_kwargs, entry, self.parsers
+            )
         context.var_kwarg = None
 
-    def _validate(self, context: CommandParameterParser.Context, parameters: list[CommandParameter]) -> None:
+    def _validate(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: list[CommandParameter],
+    ) -> None:
         required_positionals: int = 0
         for i, parameter in enumerate(parameters):
             if parameter.kind == ParameterKind.POSITIONAL_ONLY:
                 if parameter.default == parameter.empty and len(context.arguments) <= i:
-                    raise ParsingError(parameter.name, f"Missing required positional '{parameter.name}'")
+                    raise ParsingError(
+                        parameter.name,
+                        f"Missing required positional '{parameter.name}'",
+                    )
                 continue
 
             if parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD:
@@ -601,21 +771,40 @@ class CommandParameterParser:
                 if len(context.arguments) > i:
                     continue
                 if parameter.private_name not in context.keyword_arguments:
-                    raise ParsingError(parameter.name, f"Missing required keyword/positional '{parameter.name}'")
-            if parameter.default != parameter.empty or parameter.kind in (ParameterKind.VAR_POSITIONAL, ParameterKind.VAR_KEYWORD):
+                    raise ParsingError(
+                        parameter.name,
+                        f"Missing required keyword/positional '{parameter.name}'",
+                    )
+            if parameter.default != parameter.empty or parameter.kind in (
+                ParameterKind.VAR_POSITIONAL,
+                ParameterKind.VAR_KEYWORD,
+            ):
                 continue
 
             if parameter.private_name not in context.keyword_arguments:
-                raise ParsingError(parameter.name, f"Missing required keyword '{parameter.name}'")
+                raise ParsingError(
+                    parameter.name, f"Missing required keyword '{parameter.name}'"
+                )
 
         if len(context.arguments) < required_positionals:
-            raise ParsingError(parameters[len(context.arguments)].name, f"Missing required positional '{parameters[len(context.arguments)].name}'")
+            raise ParsingError(
+                parameters[len(context.arguments)].name,
+                f"Missing required positional '{parameters[len(context.arguments)].name}'",
+            )
 
-    def parse(self, parameters: list[CommandParameter], entries: list[str]) -> tuple[list[Any], dict[str, Any]]:
-        context: CommandParameterParser.Context = CommandParameterParser.Context(parameters)
+    def parse(
+        self, parameters: list[CommandParameter], entries: list[str]
+    ) -> tuple[list[Any], dict[str, Any]]:
+        context: CommandParameterParser.Context = CommandParameterParser.Context(
+            parameters
+        )
 
         for i, entry in enumerate(entries):
-            within_bypass: bool = context.var_args is not None and context.var_args.bypasses_parsing and i >= context.var_args_index
+            within_bypass: bool = (
+                context.var_args is not None
+                and context.var_args.bypasses_parsing
+                and i >= context.var_args_index
+            )
 
             if entry == self.argument_separator and not within_bypass:
                 context.no_keywords = True
@@ -630,28 +819,51 @@ class CommandParameterParser:
                 continue
 
             if context.var_kwarg is not None:
-                self._next_var_kwarg_value(context, parameters, within_bypass, entries, i)
+                self._next_var_kwarg_value(
+                    context, parameters, within_bypass, entries, i
+                )
                 continue
 
             if within_bypass:
                 context.arguments.append(entry)
                 continue
-            elif context.var_args is not None and len(context.arguments) > context.var_args_index:
-                context.arguments.append(parse_with_hooks(context.var_args, entry, self.parsers))
+            elif (
+                context.var_args is not None
+                and len(context.arguments) > context.var_args_index
+            ):
+                context.arguments.append(
+                    parse_with_hooks(context.var_args, entry, self.parsers)
+                )
                 continue
 
             if len(context.arguments) >= len(parameters):
-                raise ParsingError(context.arguments[len(parameters) - (1 if len(context.arguments) == len(parameters) else 0)], "Too many positional arguments")
+                raise ParsingError(
+                    context.arguments[
+                        len(parameters)
+                        - (1 if len(context.arguments) == len(parameters) else 0)
+                    ],
+                    "Too many positional arguments",
+                )
 
             parameter: CommandParameter = parameters[len(context.arguments)]
-            if parameter.kind in (ParameterKind.KEYWORD_ONLY, ParameterKind.VAR_KEYWORD):
-                raise ParsingError(context.arguments[len(parameters)], "Too many positional arguments")
+            if parameter.kind in (
+                ParameterKind.KEYWORD_ONLY,
+                ParameterKind.VAR_KEYWORD,
+            ):
+                raise ParsingError(
+                    context.arguments[len(parameters)], "Too many positional arguments"
+                )
             context.arguments.append(parse_with_hooks(parameter, entry, self.parsers))
 
         if context.keyword_parameter is not None:
-            raise MissingKeywordArgumentValueError(context.keyword_parameter.name, f"'{context.keyword_parameter.name}' is missing a value")
+            raise MissingKeywordArgumentValueError(
+                context.keyword_parameter.name,
+                f"'{context.keyword_parameter.name}' is missing a value",
+            )
         if context.var_kwarg is not None:
-            raise MissingKeywordArgumentValueError(context.var_kwarg, f"'{context.var_kwarg}' is missing a value")
+            raise MissingKeywordArgumentValueError(
+                context.var_kwarg, f"'{context.var_kwarg}' is missing a value"
+            )
 
         self._validate(context, parameters)
         return context.arguments, context.keyword_arguments
@@ -662,24 +874,26 @@ def parse_parameters(
     entries: list[str],
     keyword_prefix: str,
     argument_separator: str,
-    parsers: dict[CommandParameterType, Callable[[str], Any]]
+    parsers: dict[CommandParameterType, Callable[[str], Any]],
 ) -> tuple[list[Any], dict[str, Any]]:
-    return CommandParameterParser(keyword_prefix, argument_separator, parsers).parse(parameters, entries)
+    return CommandParameterParser(keyword_prefix, argument_separator, parsers).parse(
+        parameters, entries
+    )
 
 
 __all__ = [
-    "Parameter",
-    "ParsingError",
-    "MissingKeywordArgumentValueError",
     "Alias",
-    "Description",
     "AnnotationPreview",
-    "DefaultPreview",
-    "ParseHooks",
-    "CustomAttrbute",
     "CommandParameter",
     "CommandParameterBuilder",
-    "parse_with_hooks",
+    "CustomAttrbute",
+    "DefaultPreview",
+    "Description",
+    "MissingKeywordArgumentValueError",
+    "Parameter",
+    "ParseHooks",
+    "ParsingError",
     "add_to_container_type",
     "parse_parameters",
+    "parse_with_hooks",
 ]

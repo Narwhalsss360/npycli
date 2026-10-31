@@ -53,9 +53,13 @@ class InPlacePrint:
         if self.last_lines is not None:
             if len(self.last_lines) > len(lines):
                 clearing_line: str = " " * terminal_size.columns
-                with_clearing.extend(clearing_line for _ in range(len(self.last_lines) - len(lines)))
+                with_clearing.extend(
+                    clearing_line for _ in range(len(self.last_lines) - len(lines))
+                )
 
-            padding: list[int] = [len(strip_control_sequences(last_line)) for last_line in self.last_lines]
+            padding: list[int] = [
+                len(strip_control_sequences(last_line)) for last_line in self.last_lines
+            ]
             if len(padding) < len(with_clearing):
                 padding.extend(0 for _ in range(len(lines) - len(padding)))
             with_clearing = InPlacePrint.pad(with_clearing, padding)
@@ -93,7 +97,10 @@ class InPlacePrint:
             return False
 
         clearing_line: str = " " * terminal_size.columns
-        print("\n".join([clearing_line for _ in range(len(self.last_lines))]), file=self._file)
+        print(
+            "\n".join([clearing_line for _ in range(len(self.last_lines))]),
+            file=self._file,
+        )
         CUU(len(self.last_lines), file=self._file)
         return True
 
@@ -153,10 +160,7 @@ def make_tree_string(working: Path, path: Path) -> str:
     return out
 
 
-def main(
-    working_directory: Path | None = None,
-    interval: float = 0.05
-) -> None:
+def main(working_directory: Path | None = None, interval: float = 0.05) -> None:
     working_directory = working_directory or Path(".")
     print(
         f"{SGR(SLOWLY_BLINKING)}Walking "
@@ -169,7 +173,9 @@ def main(
     try:
         for root, _, files in working_directory.walk():
             for file in files:
-                if not in_place(make_tree_string(working_directory, root.joinpath(file))):
+                if not in_place(
+                    make_tree_string(working_directory, root.joinpath(file))
+                ):
                     print(chr(0x2500) * get_terminal_size().columns)
                 sleep(interval)
 

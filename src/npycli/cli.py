@@ -1,23 +1,30 @@
 from collections.abc import Callable
-from typing import Optional, Any
 from shlex import split
-from .parameters import CommandParameterType
+from typing import Any
+
 from .command import Command
-from .errors import EmptyEntriesError, CommandDoesNotExistError, CLIError
+from .errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
+from .parameters import CommandParameterType
 
 
 class CLI:
-    def __init__(self, title: Optional[str] = None, prompt_marker: Optional[str] = None,
-                 kwarg_prefix: Optional[str] = None, parsers: Optional[dict[CommandParameterType, Callable[[str], Any]]] = None,
-                 env: Optional[dict[Any, Any]] = None, retval_handler: Optional[Callable[[Command, Any], Any]] = None,
-                 error_handler: Optional[Callable[[Command, Exception], Any]] = None) -> None:
-        self.title: str = title or 'CLI'
-        self.prompt_marker: str = prompt_marker or '>'
-        self.kwarg_prefix: str = kwarg_prefix or '--'
+    def __init__(
+        self,
+        title: str | None = None,
+        prompt_marker: str | None = None,
+        kwarg_prefix: str | None = None,
+        parsers: dict[CommandParameterType, Callable[[str], Any]] | None = None,
+        env: dict[Any, Any] | None = None,
+        retval_handler: Callable[[Command, Any], Any] | None = None,
+        error_handler: Callable[[Command, Exception], Any] | None = None,
+    ) -> None:
+        self.title: str = title or "CLI"
+        self.prompt_marker: str = prompt_marker or ">"
+        self.kwarg_prefix: str = kwarg_prefix or "--"
         self.parsers: dict[CommandParameterType, Callable[[str], Any]] = parsers or {}
         self.env: dict[Any, Any] = env or {}
-        self._retval_handler: Optional[Callable[[Command, Any], Any]] = retval_handler
-        self._error_handler: Optional[Callable[[Command, Exception], Any]] = error_handler
+        self._retval_handler: Callable[[Command, Any], Any] | None = retval_handler
+        self._error_handler: Callable[[Command, Exception], Any] | None = error_handler
         self._commands: list[Command] = []
 
     @property
@@ -36,9 +43,9 @@ class CLI:
         :return: *title* *prompt marker*
         """
 
-        return f'{self.title}{self.prompt_marker}'
+        return f"{self.title}{self.prompt_marker}"
 
-    def get_command(self, name: str) -> Optional[Command]:
+    def get_command(self, name: str) -> Command | None:
         """
         Get the command with the specified name. If it does not exist, `None` is returned.
         :param name: Name of command.
@@ -59,8 +66,12 @@ class CLI:
 
         self._commands.append(command)
 
-    def cmd[**P, R](self, name: Optional[str] = None, names: Optional[tuple[str, ...]] = None, help: Optional[str] = None) \
-            -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def cmd[**P, R](
+        self,
+        name: str | None = None,
+        names: tuple[str, ...] | None = None,
+        help: str | None = None,
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """
         Curry function that creates a decorator that creates a `Command` from the function.
         :param name: Name of `Command`
@@ -71,32 +82,45 @@ class CLI:
 
         def decorator(function: Callable[P, R]) -> Callable[P, R]:
             self.add_command(
-                Command.create(function=function, name=name, names=names, help=help, kwarg_prefix=self.kwarg_prefix)
+                Command.create(
+                    function=function,
+                    name=name,
+                    names=names,
+                    help=help,
+                    kwarg_prefix=self.kwarg_prefix,
+                )
             )
             return function
 
         return decorator
 
-    def retvals(self) -> Callable[[Callable[[Command, Any], None]], Callable[..., Optional[Any]]]:
+    def retvals(
+        self,
+    ) -> Callable[[Callable[[Command, Any], None]], Callable[..., Any | None]]:
         """
         Curry function that creates a decorator to specify a return value handler function.
         :return: Decorator
         """
 
-        def decorator(function: Callable[[Command, Any], None]) -> Callable[[Command, Any], None]:
+        def decorator(
+            function: Callable[[Command, Any], None],
+        ) -> Callable[[Command, Any], None]:
             self._retval_handler = function
             return function
 
         return decorator
 
-    def errors(self) -> Callable[[Callable[[Command, Exception], None]], Callable[..., Any]]:
+    def errors(
+        self,
+    ) -> Callable[[Callable[[Command, Exception], None]], Callable[..., Any]]:
         """
         Curry function that creates a decorator to specify an error handler function.
         :return: Decorator
         """
 
-        def decorator(function: Callable[[Command, Exception], None]) \
-                -> Callable[[Command, Exception], None]:
+        def decorator(
+            function: Callable[[Command, Exception], None],
+        ) -> Callable[[Command, Exception], None]:
             self._error_handler = function
             return function
 
@@ -110,10 +134,10 @@ class CLI:
         """
 
         if not entries:
-            raise EmptyEntriesError('Nothing was entered.', cli=self)
+            raise EmptyEntriesError("Nothing was entered.", cli=self)
         name: str = entries.pop(0)
         if (command := self.get_command(name)) is None:
-            raise CommandDoesNotExistError(f'Command {name} does not exist.', cli=self)
+            raise CommandDoesNotExistError(f"Command {name} does not exist.", cli=self)
 
         try:
             retval: Any = command(entries, self.parsers)
@@ -126,8 +150,11 @@ class CLI:
             return self._error_handler(command, cli_error)
         except Exception as error:
             if self._error_handler is None:
-                raise CLIError(f'An exception was raised running {command.name}: {error}', cli=self,
-                               command=command) from error
+                raise CLIError(
+                    f"An exception was raised running {command.name}: {error}",
+                    cli=self,
+                    command=command,
+                ) from error
             return self._error_handler(command, error)
 
         return retval
@@ -141,6 +168,4 @@ class CLI:
         return self.exec(split(input(self.prompt_entry_marker)))
 
 
-__all__ = [
-    "CLI"
-]
+__all__ = ["CLI"]

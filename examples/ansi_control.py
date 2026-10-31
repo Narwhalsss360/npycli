@@ -13,10 +13,17 @@ from npycli.ansi.parsing import strip_control_sequences
 from npycli.ansi.sequences import CUD, CUU, IL, RCP, SCCP, SGR
 
 
-def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextIO = stdout, current_is_empty: bool = False, lines_above: int = 1) -> None:
-    '''
+def print_above(
+    *args: Any,
+    max_columns: int,
+    sep: str | None = " ",
+    file: TextIO = stdout,
+    current_is_empty: bool = False,
+    lines_above: int = 1,
+) -> None:
+    """
     Print above the current line.
-    '''
+    """
 
     if lines_above == 0:
         print(*args, sep=sep)
@@ -47,7 +54,7 @@ def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextI
     IL(line_count, file=file)
 
     # Flush, just in case current cursor position gets moved after output
-    print(output, end='', file=file, flush=True)
+    print(output, end="", file=file, flush=True)
     RCP(file=file)
     CUD(line_count, file=file)
 
@@ -56,14 +63,18 @@ def print_above(*args: Any, max_columns: int, sep: str | None = " ", file: TextI
 print(1)
 print(2)
 print(4)
-print_above("3\n3.5", max_columns=get_terminal_size().columns, current_is_empty=True) # This line will be an empty line, so current_is_empty = True
-print_above("2.5", max_columns=get_terminal_size().columns, current_is_empty=True, lines_above=3) # This line will be an empty line, so current_is_empty = True
+print_above(
+    "3\n3.5", max_columns=get_terminal_size().columns, current_is_empty=True
+)  # This line will be an empty line, so current_is_empty = True
+print_above(
+    "2.5", max_columns=get_terminal_size().columns, current_is_empty=True, lines_above=3
+)  # This line will be an empty line, so current_is_empty = True
 
 SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY, WHITE_BACKGROUND, file=stdout)
 # Or
 print(1)
 print(2)
-print(4, end='')
+print(4, end="")
 SGR(DEFAULT_RENDITION, file=stdout)
 three = f"{SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY, WHITE_BACKGROUND)}3{SGR(DEFAULT_RENDITION)}"
 print_above(three, max_columns=get_terminal_size().columns)

@@ -1,6 +1,5 @@
 from collections.abc import Callable
 from sys import argv
-from typing import Optional
 
 from npycli import Command
 
@@ -18,7 +17,7 @@ ops: dict[str, Callable[..., float]] = {
 }
 
 
-def math_op(a: float, *nums: float, op: Optional[str] = '+') -> None:
+def math_op(a: float, *nums: float, op: str | None = '+') -> None:
     if op not in ops:
         print(f'Only {ops.keys()} is supported.')
         return

@@ -1,6 +1,6 @@
 from enum import Enum
 from json import dumps, loads
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from npycli import Command
 from npycli.parsing import create_enum_parser, create_literal_parser
@@ -23,7 +23,7 @@ def main(
     num: NumEnum,
     username: Username,
     user_type: UserType,
-    decoded_json: Optional[DecodedJSON] = None
+    decoded_json: DecodedJSON | None = None,
 ) -> None:
     print(num)
     print(f"{user_type}:{username}")
@@ -34,14 +34,16 @@ def main(
 cmd: Command = Command.create(main)
 if __name__ == "__main__":
     print(cmd.extended_command_help())
-    cmd([
-        "Zero",
-        "username",
-        "admin",
-        dumps({pair.name: pair.value for pair in NumEnum})
-    ], {
-        NumEnum: create_enum_parser(NumEnum),
-        DecodedJSON: loads,
-        UserType: create_literal_parser(UserType)
-    })
-
+    cmd(
+        [
+            "Zero",
+            "username",
+            "admin",
+            dumps({pair.name: pair.value for pair in NumEnum}),
+        ],
+        {
+            NumEnum: create_enum_parser(NumEnum),
+            DecodedJSON: loads,
+            UserType: create_literal_parser(UserType),
+        },
+    )

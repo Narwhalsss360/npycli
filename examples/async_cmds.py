@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import shlex
 from types import FunctionType
-from typing import Any, Optional
+from typing import Any, cast
 
 from npycli import CLI, CLIError, Command, EmptyEntriesError
 
@@ -10,7 +10,7 @@ cli = CLI("async program")
 
 
 @cli.cmd("do-async-operation")
-async def do_async_operation(sleeptime: Optional[float] = None) -> None:
+async def do_async_operation(sleeptime: float | None = None) -> None:
     await asyncio.sleep(sleeptime or 1)
     print("Done!")
 
@@ -33,7 +33,7 @@ async def quit() -> FunctionType:
 
 
 @cli.retvals()
-def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
+def retvals(command: Command, return_value: Any | None) -> Any | None:
     print(f"{command} -> {return_value}")
     return command, return_value
 
@@ -43,7 +43,9 @@ async def main() -> None:
         try:
             # Asynchronously wait for input in another thread to not block this event loop
             try:
-                user_input: str = await asyncio.to_thread(input, cli.prompt_entry_marker)
+                user_input: str = await asyncio.to_thread(
+                    input, cli.prompt_entry_marker
+                )
             except KeyboardInterrupt:
                 break
 
@@ -53,7 +55,10 @@ async def main() -> None:
 
             # If the invoked command was a coroutine, await the coroutine and reprocess it in retvals handler
             if inspect.iscoroutine(retval):
-                retval = retvals(command, await retval)[1]
+                retval = retvals(command, await retval)
+                assert isinstance(retval, tuple)
+                assert len(retval) == 2  # pyright: ignore[reportUnknownArgumentType]
+                retval = cast(Any | None, retval[1])
 
             if retval == quit:
                 return
@@ -63,8 +68,10 @@ async def main() -> None:
             break
         except EmptyEntriesError:  # If the user entered nothing, just continue
             pass
-        except CLIError as err:  # Catch errors that occur between here and execution of command
-            print(f'{err.__class__.__name__}: {err.args[0]}')
+        except (
+            CLIError
+        ) as err:  # Catch errors that occur between here and execution of command
+            print(f"{err.__class__.__name__}: {err.args[0]}")
 
 
 if __name__ == "__main__":

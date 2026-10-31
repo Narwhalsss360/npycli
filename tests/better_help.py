@@ -1,5 +1,5 @@
 from types import NoneType
-from typing import Annotated, Optional
+from typing import Annotated
 
 from npycli import CLI, Command, CommandDoesNotExistError, EmptyEntriesError
 from npycli.kwarg_aliasing import alias_cmd_kwargs
@@ -8,61 +8,63 @@ from npycli.parameters import CommandParameter, Description
 TAB_CHARS: str = " " * 4
 
 
-cli = CLI(title='user-items', prompt_marker='->', env={'user-items': {}})
+cli = CLI(title="user-items", prompt_marker="->", env={"user-items": {}})
 
 
 def __log_out__(text: str) -> None:
-    with open(f'{__name__}.log', 'a+', encoding='utf-8') as log_file:
+    with open(f"{__name__}.log", "a+", encoding="utf-8") as log_file:
         log_file.write(text)
 
 
 def user_items() -> dict[str, str]:
-    return cli.env['user-items']
+    return cli.env["user-items"]
 
 
-@cli.cmd(name='add')
-@alias_cmd_kwargs({'key': ('k',), 'value': ('v',)})
+@cli.cmd(name="add")
+@alias_cmd_kwargs({"key": ("k",), "value": ("v",)})
 def add_item(key: str, value: str) -> str:
     if key in user_items():
-        return f'Key {key} already exists'
+        return f"Key {key} already exists"
     user_items()[key] = value
-    return f'Added {key}: {value}'
+    return f"Added {key}: {value}"
 
 
-@cli.cmd(name='change')
+@cli.cmd(name="change")
 def change_item(key: str, value: str) -> str:
     if key not in user_items():
-        return f'Key {key} does not exist'
+        return f"Key {key} does not exist"
     old_value: str = user_items()[key]
     user_items()[key] = value
-    return f'Swapped value of {key} from {old_value} for {value}'
+    return f"Swapped value of {key} from {old_value} for {value}"
 
 
-@cli.cmd(name='show')
-def show_item(key: Optional[str] = None) -> str:
+@cli.cmd(name="show")
+def show_item(key: str | None = None) -> str:
     if key is None:
-        s = ''
+        s = ""
         for k, v in user_items().items():
-            s += f'{k}: {v}\n'
+            s += f"{k}: {v}\n"
         return s
     if key not in user_items():
-        return f'Key {key} does not exist'
-    return f'{key}: {user_items()[key]}'
+        return f"Key {key} does not exist"
+    return f"{key}: {user_items()[key]}"
 
 
-@cli.cmd(names=('delete', 'del', 'remove', 'rm', 'pop'))
+@cli.cmd(names=("delete", "del", "remove", "rm", "pop"))
 def delete_item(key: str) -> str:
     if key not in user_items():
-        return f'Key {key} does not exist'
-    return f'Popped {key}: {user_items().pop(key)}'
+        return f"Key {key} does not exist"
+    return f"Popped {key}: {user_items().pop(key)}"
 
 
-@cli.cmd(name='help')
+@cli.cmd(name="help")
 def show_help(
     command_name: str | None = None,
-    parameter_name: Annotated[str | None, Description("Show help of a specific command parameter")] = None,
+    parameter_name: Annotated[
+        str | None, Description("Show help of a specific command parameter")
+    ] = None,
     /,
-    extended: bool = False
+    extended: bool = False,
 ) -> str:
     if command_name is None:
         names: list[str] = []
@@ -75,7 +77,7 @@ def show_help(
 
         name_fmt = f"<{longest_name_length + 2}"
 
-        help_str = ''
+        help_str = ""
         for name, description in zip(names, descriptions):
             help_str += f"{format(name, name_fmt)}| {description}\n"
         help_str += "Send KeyboardInterrupt (SIGINT), CTRL+C to exit"
@@ -123,12 +125,16 @@ def show_help(
 
         else:
             for i, parameter in enumerate(command.parameters):
-                out += f"{TAB_CHARS}{parameter.name}: {"".join(f"{str(None) if t == NoneType else t.__name__} " for t in parameter.argument_types)} {parameter.description}"
+                out += f"{TAB_CHARS}{parameter.name}: {''.join(f'{str(None) if t == NoneType else t.__name__} ' for t in parameter.argument_types)} {parameter.description}"
                 if i != len(command.parameters) - 1:
                     out += "\n"
         return out
 
-    if (parameter := next(filter(lambda p: parameter_name in p.names, command.parameters), None)) is None:
+    if (
+        parameter := next(
+            filter(lambda p: parameter_name in p.names, command.parameters), None
+        )
+    ) is None:
         return f"'{parameter_name}' is not a parameter of '{command_name}'"
 
     return f"{out}{parameter_details(parameter)}"
@@ -136,14 +142,15 @@ def show_help(
 
 @cli.retvals()
 def retvals(command: Command, retval: str) -> None:
-    __log_out__(f'{command.name}:\n{retval}\n')
+    __log_out__(f"{command.name}:\n{retval}\n")
     print(retval)
 
 
 @cli.errors()
-def errors(command: Optional[Command], exception: Exception) -> None:
+def errors(command: Command | None, exception: Exception) -> None:
     print(
-        f'Exception {exception.__class__.__name__} thrown: {exception} | {exception.args} - {f" Running command {command.name}" if command is not None else ""}')
+        f"Exception {exception.__class__.__name__} thrown: {exception} | {exception.args} - {f' Running command {command.name}' if command is not None else ''}"
+    )
 
 
 def main() -> None:
@@ -159,6 +166,5 @@ def main() -> None:
             break
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

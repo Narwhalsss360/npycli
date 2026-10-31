@@ -30,7 +30,7 @@ def draw_screen(char: str, tsize: terminal_size) -> None:
 
 def main() -> None:
     P_SM(USE_ALTERNATE_SCREEN_BUFFER, file=stdout)
-    for i in range(ord('A'), ord('Z') + 1):
+    for i in range(ord("A"), ord("Z") + 1):
         draw_screen(chr(i), get_terminal_size())
         sleep(0.5)
     P_RM(USE_MAIN_SCREEN_BUFFER, file=stdout)
