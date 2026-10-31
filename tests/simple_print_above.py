@@ -121,9 +121,9 @@ async def main() -> None:
         sleep_task: Task[None] = create_task(sleep(0.4))
 
         def canceller(
-            input_task: Task[str], sleep_task: Task[None] = sleep_task
+            _: Task[str], sleep_task_captured: Task[None] = sleep_task
         ) -> None:
-            sleep_task.cancel()
+            sleep_task_captured.cancel()
 
         input_task.add_done_callback(canceller)
         try:

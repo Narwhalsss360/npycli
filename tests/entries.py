@@ -42,7 +42,7 @@ def parse_bypass_with_positionals_and_kwargs_and_var_kwargs(
     key: str = "value",
     **kwargs: str,
 ) -> None:
-    """First give me some positionals, maybe some bool flags and some keyword arguments, and all of the parsed keywords,
+    """First give me some positionals, maybe some bool flags and some keyword arguments, and all the parsed keywords,
     but the rest (basically just positionals), just the (string) args."""
 
     name = name.upper() if upper else name

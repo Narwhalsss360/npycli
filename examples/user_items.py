@@ -160,6 +160,7 @@ def errors(command: Command, exc: Exception) -> Any | None:
         [f"{' ' * TAB_WIDTH}{e.__class__.__name__}: {e}" for e in causes(exc, True)]
     )
     print(f"{command.name} error:\n{errors_string}")
+    return None
 
 
 def as_prompter() -> None:

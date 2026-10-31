@@ -158,8 +158,9 @@ def create_enum_parser[T](enum_type: type[T]) -> Callable[[str], T]:
 
 
 __all__ = [
+    "create_enum_parser",
     "create_literal_parser",
     "extract_positionals_keywords",
     "parse_args_as",
-    "type_from_annotation",
+    "type_from_annotation"
 ]

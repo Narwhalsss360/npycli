@@ -1,5 +1,5 @@
 from asyncio import CancelledError, gather, run
-from os.path import basename
+from pathlib import Path
 from sys import argv, exit, stderr
 from typing import Annotated
 
@@ -20,15 +20,15 @@ from npycli.errors import CommandArgumentError
 from npycli.parameters import AnnotationPreview
 
 
-def print_error(e: Exception) -> None:
-    if isinstance(e, ClientResponseError):
-        message: str = f"{e.code} {e.message}"
+def print_error(exc: Exception) -> None:
+    if isinstance(exc, ClientResponseError):
+        message: str = f"{exc.status} {exc.message}"
     else:
-        message: str = f" {'\n\t'.join(str(arg) for arg in e.args)}"
+        message: str = f" {'\n\t'.join(str(arg) for arg in exc.args)}"
 
     print(
         SGR(BOLD_OR_INCREASED_INTENSITY, RED_DISPLAY),
-        f"{e.__class__.__name__}:",
+        f"{exc.__class__.__name__}:",
         SGR(DEFAULT_RENDITION),
         " ",
         message,
@@ -59,7 +59,7 @@ async def main(
             )
 
     async with ClientSession() as session:
-        values: list[str] = await gather(
+        values: tuple[str] = await gather(
             *[fetch_string(session, build_gh_gitignore_url(name)) for name in templates]
         )
 
@@ -71,7 +71,7 @@ async def main(
     )
 
 
-cmd: Command = Command.create(main, basename(__file__).replace(".py", ""))
+cmd: Command = Command.create(main, Path(__file__).name.replace(".py", ""))
 if __name__ == "__main__":
     if len(argv) == 1:
         print(cmd)

@@ -82,7 +82,7 @@ class ParseHooks:
         return repr(self)
 
 
-class CustomAttrbute:
+class CustomAttribute:
     def __init__(self, key: str, value: Any, overwrite: bool = False) -> None:
         self.key: str = key
         self.value: Any = value
@@ -126,7 +126,7 @@ class CommandParameter:
         self._custom_attributes: dict[str, Any] = {}
         self._container_annotation: Any | None = None
         self._private_name: str | None = None
-        self._validate_data()
+        self.validate_data()
 
     @staticmethod
     def build(
@@ -305,7 +305,7 @@ class CommandParameter:
     def remove_custom_attribute(self, key: str) -> Any:
         return self._custom_attributes.pop(key)
 
-    def _validate_data(self) -> None:
+    def validate_data(self) -> None:
         assert len(self.names), "Parameters must have at least 1 name"
         assert len(self.argument_types), "Parameters must have at least 1 type"
 
@@ -367,7 +367,7 @@ class CommandParameterBuilder:
             self._parameter.default_preview = annotation.default_preview
         elif isinstance(annotation, ParseHooks):
             self._parameter.parse_hooks = annotation
-        elif isinstance(annotation, CustomAttrbute):
+        elif isinstance(annotation, CustomAttribute):
             self._parameter.add_custom_attribute(
                 annotation.key, annotation.value, annotation.overwrite
             )
@@ -492,7 +492,7 @@ class CommandParameterBuilder:
         if self._parameter.names is CommandParameterBuilder.DEFAULT_NAMES:
             self._parameter.names = (self._name,)
 
-        self._parameter._validate_data()  # pyright: ignore [reportPrivateUsage]
+        self._parameter.validate_data()  # pyright: ignore [reportPrivateUsage]
         return self._parameter
 
 
@@ -687,9 +687,7 @@ class CommandParameterParser:
     def _next_keyword_value(
         self,
         context: CommandParameterParser.Context,
-        parameters: list[CommandParameter],
-        bypass_parse: bool,
-        entries: list[str],
+            entries: list[str],
         i: int,
     ) -> None:
         assert context.keyword_parameter is not None
@@ -725,9 +723,7 @@ class CommandParameterParser:
     def _next_var_kwarg_value(
         self,
         context: CommandParameterParser.Context,
-        parameters: list[CommandParameter],
-        bypass_parse: bool,
-        entries: list[str],
+            entries: list[str],
         i: int,
     ) -> None:
         assert context.var_kwarg is not None
@@ -750,9 +746,9 @@ class CommandParameterParser:
             )
         context.var_kwarg = None
 
+    @staticmethod
     def _validate(
-        self,
-        context: CommandParameterParser.Context,
+            context: CommandParameterParser.Context,
         parameters: list[CommandParameter],
     ) -> None:
         required_positionals: int = 0
@@ -815,12 +811,12 @@ class CommandParameterParser:
                 continue
 
             if context.keyword_parameter is not None:
-                self._next_keyword_value(context, parameters, within_bypass, entries, i)
+                self._next_keyword_value(context, entries, i)
                 continue
 
             if context.var_kwarg is not None:
                 self._next_var_kwarg_value(
-                    context, parameters, within_bypass, entries, i
+                    context, entries, i
                 )
                 continue
 
@@ -884,13 +880,16 @@ def parse_parameters(
 __all__ = [
     "Alias",
     "AnnotationPreview",
+    "BypassParse",
     "CommandParameter",
     "CommandParameterBuilder",
-    "CustomAttrbute",
+    "CommandParameterType",
+    "CustomAttribute",
     "DefaultPreview",
     "Description",
     "MissingKeywordArgumentValueError",
     "Parameter",
+    "ParameterKind",
     "ParseHooks",
     "ParsingError",
     "add_to_container_type",

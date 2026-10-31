@@ -152,7 +152,7 @@ def make_tree_string(working: Path, path: Path) -> str:
         else:
             out += chr(0x251C)
 
-        out += chr(0x2500) * (i)
+        out += chr(0x2500) * i
         out += " " + n
 
         if i != len(nodes) - 1:

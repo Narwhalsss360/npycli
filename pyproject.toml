@@ -12,9 +12,14 @@ readme = { file = "README.md", content-type = "text/markdown" }
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["cli", "npy", "command", "line", "interface", "terminal", "term", "con", "console", "ansi", "ecma48"]
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 version = "0.5.0"
 
