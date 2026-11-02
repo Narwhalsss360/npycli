@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .cli import CLI
     from .command import Command
+    from .middleware import Middleware
 
 
 class ParsingError(Exception):
@@ -26,7 +27,9 @@ class TooManyArgumentsError(ParsingError):
 
 
 class CLIError(Exception):
-    def __init__(self, *args: Any, cli: CLI | None = None, command: Command | None = None) -> None:
+    def __init__(
+        self, *args: Any, cli: CLI | None = None, command: Command | None = None
+    ) -> None:
         super().__init__(*args)
         self.cli: CLI | None = cli
         self.command: Command | None = command
@@ -47,6 +50,12 @@ class CommandArgumentError(CLIError):
         super().__init__(*args, **kwargs)
 
 
+class MiddlewareError(CLIError):
+    def __init__(self, *args: Any, middleware: Middleware | None):
+        super().__init__(*args)
+        self.middleware: Middleware | None = middleware
+
+
 def causes(exception: BaseException, include_self: bool) -> Iterator[BaseException]:
     exc: BaseException | None = exception if include_self else exception.__cause__
     while exc is not None:
@@ -59,6 +68,7 @@ __all__ = [
     "CommandArgumentError",
     "CommandDoesNotExistError",
     "EmptyEntriesError",
+    "MiddlewareError",
     "MissingKeywordArgumentValueError",
     "ParsingError",
     "TooManyArgumentsError",

@@ -1,4 +1,13 @@
-from . import ansi, cli, command, errors, kwarg_aliasing, parameters, parsing
+from . import (
+    ansi,
+    cli,
+    command,
+    errors,
+    kwarg_aliasing,
+    middleware,
+    parameters,
+    parsing,
+)
 from . import ansi as ecma48
 from .cli import CLI
 from .command import Command
@@ -46,6 +55,7 @@ __all__ = [
     "ecma48",
     "errors",
     "kwarg_aliasing",
+    "middleware",
     "parameters",
     "parsing",
 ]

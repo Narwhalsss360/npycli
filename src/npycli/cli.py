@@ -1,10 +1,22 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from shlex import split
-from typing import Any
+from typing import TYPE_CHECKING, Any, Self
 
 from .command import Command
 from .errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
 from .parameters import CommandParameterType
+
+if TYPE_CHECKING:
+    from .middleware import (
+        CommandAddedResult,
+        ErrorResult,
+        ExecutorResult,
+        Middleware,
+        PrompterResult,
+        ReturnValueResult,
+    )
 
 
 class CLI:
@@ -26,6 +38,15 @@ class CLI:
         self._retval_handler: Callable[[Command, Any], Any] | None = retval_handler
         self._error_handler: Callable[[Command, Exception], Any] | None = error_handler
         self._commands: list[Command] = []
+        self._middlewares: list[Middleware] = []
+
+    @property
+    def middlewares(self) -> list[Middleware]:
+        return [mid for mid in self._middlewares]
+
+    def use[T: Middleware](self, middleware: type[T]) -> Self:
+        self._middlewares.append(middleware.on_use(self))
+        return self
 
     @property
     def commands(self) -> list[Command]:
@@ -52,10 +73,7 @@ class CLI:
         :return: `Command` that matches `name`
         """
 
-        try:
-            return next(filter(lambda cmd: name in cmd.names, self.commands))
-        except StopIteration:
-            return None
+        return next(filter(lambda cmd: name in cmd.names, self.commands), None)
 
     def add_command(self, command: Command) -> None:
         """
@@ -64,7 +82,18 @@ class CLI:
         :return: `None`
         """
 
-        self._commands.append(command)
+        last_flagged_result: CommandAddedResult | None = None
+        last_result: CommandAddedResult | None = None
+        for middleware in self._middlewares:
+            result: CommandAddedResult = middleware.command_added(
+                command, last_result, last_flagged_result
+            )
+            last_result = result
+            if result.inhibit:
+                last_flagged_result = result
+
+        if last_flagged_result is None:
+            self._commands.append(command)
 
     def cmd[**P, R](
         self,
@@ -135,27 +164,72 @@ class CLI:
 
         if not entries:
             raise EmptyEntriesError("Nothing was entered.", cli=self)
+
         name: str = entries.pop(0)
         if (command := self.get_command(name)) is None:
             raise CommandDoesNotExistError(f"Command {name} does not exist.", cli=self)
 
         try:
-            retval: Any = command(entries, self.parsers)
+            executor: Callable[
+                [
+                    Command,
+                    list[str],
+                    dict[CommandParameterType, Callable[[str], Any]] | None,
+                ],
+                tuple[Command, Any],
+            ] = lambda cmd, entries, parsers: (
+                cmd,
+                Command.exec_with(cmd, entries, parsers),
+            )
+
+            last_flagged_executor_result: ExecutorResult | None = None
+            for middleware in self.middlewares:
+                executor_result: ExecutorResult = middleware.executor(
+                    command, last_flagged_executor_result
+                )
+                if executor_result.executor is not None:
+                    last_flagged_executor_result = executor_result
+                    executor = executor_result.executor
+
+            command, retval = executor(command, entries, self.parsers)
+
             if self._retval_handler is not None:
-                return self._retval_handler(command, retval)
+                retval = self._retval_handler(command, retval)
         except CLIError as cli_error:
+            last_error_result: ErrorResult | None = None
+            for middleware in self._middlewares:
+                error_result: ErrorResult = middleware.error(
+                    command, cli_error, last_error_result
+                )
+                last_error_result = error_result
+
             if self._error_handler is None:
                 cli_error.cli = self
                 raise
-            return self._error_handler(command, cli_error)
+
+            retval = self._error_handler(command, cli_error)
         except Exception as error:
+            last_error_result: ErrorResult | None = None
+            for middleware in self._middlewares:
+                error_result: ErrorResult = middleware.error(
+                    command, error, last_error_result
+                )
+                last_error_result = error_result
+
             if self._error_handler is None:
                 raise CLIError(
                     f"An exception was raised running {command.name}: {error}",
                     cli=self,
                     command=command,
                 ) from error
-            return self._error_handler(command, error)
+            retval = self._error_handler(command, error)
+
+        last_return_value_result: ReturnValueResult | None = None
+        for middleware in self._middlewares:
+            return_value_result: ReturnValueResult = middleware.return_value(
+                command, retval, last_return_value_result
+            )
+            last_return_value_result = return_value_result
 
         return retval
 
@@ -165,7 +239,17 @@ class CLI:
         :return: Command function return value
         """
 
-        return self.exec(split(input(self.prompt_entry_marker)))
+        prompter: Callable[[str], str] = lambda s: input(s)
+        last_flagged_result: PrompterResult | None = None
+        for middleware in self._middlewares:
+            result: PrompterResult = middleware.prompter(last_flagged_result)
+            if result.prompter is not None:
+                last_flagged_result = result
+
+        if last_flagged_result is not None and last_flagged_result.prompter is not None:
+            prompter = last_flagged_result.prompter
+
+        return self.exec(split(prompter(self.prompt_entry_marker)))
 
 
 __all__ = ["CLI"]

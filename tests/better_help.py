@@ -3,7 +3,7 @@ from typing import Annotated
 
 from npycli import CLI, Command, CommandDoesNotExistError, EmptyEntriesError
 from npycli.kwarg_aliasing import alias_cmd_kwargs
-from npycli.parameters import CommandParameter, Description
+from npycli.parameters import CommandParameter
 
 TAB_CHARS: str = " " * 4
 
@@ -57,87 +57,51 @@ def delete_item(key: str) -> str:
     return f"Popped {key}: {user_items().pop(key)}"
 
 
-@cli.cmd(name="help")
-def show_help(
+@cli.cmd(
+    name="help",
+    help=(
+        "<...>: Positional or Keyword\n"
+        "<*...>: Variable Positional\n"
+        "<**...>: Variable Keyword\n"
+        "/: Positional / Keyword Only Delimiter\n"
+        "<: ...>: Type\n"
+        "<: = ...>: Default Value\n"
+        "[...]: Boolean Flag (Keyword only, no value needed)\n"
+    ),
+)
+def help_cmd(
     command_name: str | None = None,
-    parameter_name: Annotated[
-        str | None, Description("Show help of a specific command parameter")
-    ] = None,
+    parameter_name: str | None = None,
     /,
     extended: bool = False,
 ) -> str:
+    if extended:
+        command_help, parameter_help = (
+            Command.extended_command_help,
+            CommandParameter.extended_parameter_help,
+        )
+    else:
+        command_help, parameter_help = (
+            Command.basic_command_help,
+            CommandParameter.basic_parameter_help,
+        )
+
     if command_name is None:
-        names: list[str] = []
-        longest_name_length: int = 0
-        descriptions: list[str] = []
-        for command in cli.commands:
-            longest_name_length = max(longest_name_length, len(command.name))
-            names.append(command.name)
-            descriptions.append(command.details or "")
-
-        name_fmt = f"<{longest_name_length + 2}"
-
-        help_str = ""
-        for name, description in zip(names, descriptions):
-            help_str += f"{format(name, name_fmt)}| {description}\n"
-        help_str += "Send KeyboardInterrupt (SIGINT), CTRL+C to exit"
-        return help_str
+        return "\n".join(command_help(command) for command in cli.commands)
 
     if (command := cli.get_command(command_name)) is None:
-        return f"'{command_name}' is not a command."
+        return f"{command_name} is not a command."
 
-    out: str = ""
-    for i, name in enumerate(command.names):
-        out += name
-        if i != len(command.names) - 1:
-            out += " "
-    out += "\n"
+    if parameter_name is not None:
+        if (
+            parameter := next(
+                filter(lambda p: parameter_name in p.names, command.parameters), None
+            )
+        ) is None:
+            return f"'{parameter_name}' is not a parameter"
+        return parameter_help(parameter)
 
-    def parameter_details(parameter: CommandParameter) -> str:
-        out: str = ""
-        for i, name in enumerate(parameter.names):
-            out += name
-            if i == len(parameter.names) - 1:
-                out += " ->"
-            out += " "
-
-        for i, t in enumerate(parameter.argument_types):
-            out += str(None) if t == NoneType else t.__name__
-            if i != len(parameter.argument_types) - 1:
-                out += " "
-
-        out += f"\nKind: {parameter.kind.name}\n"
-        if parameter.default_preview:
-            out += f"Default: {parameter.default_preview}"
-        elif parameter.default != parameter.empty:
-            out += f"Default: {parameter.default!r}"
-
-        if parameter.description:
-            out += f"\n{parameter.description}"
-        return out
-
-    if parameter_name is None:
-        if extended:
-            for i, parameter in enumerate(command.parameters):
-                out += parameter_details(parameter).replace("\n", f"\n{TAB_CHARS}")
-                if i != len(command.parameters) - 1:
-                    out += "\n"
-
-        else:
-            for i, parameter in enumerate(command.parameters):
-                out += f"{TAB_CHARS}{parameter.name}: {''.join(f'{str(None) if t == NoneType else t.__name__} ' for t in parameter.argument_types)} {parameter.description}"
-                if i != len(command.parameters) - 1:
-                    out += "\n"
-        return out
-
-    if (
-        parameter := next(
-            filter(lambda p: parameter_name in p.names, command.parameters), None
-        )
-    ) is None:
-        return f"'{parameter_name}' is not a parameter of '{command_name}'"
-
-    return f"{out}{parameter_details(parameter)}"
+    return command_help(command)
 
 
 @cli.retvals()

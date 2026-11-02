@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from inspect import Signature, getdoc, signature
-from typing import Any, get_type_hints
+from inspect import getdoc, signature
+from typing import Any, get_type_hints, override
 
 from .errors import CommandArgumentError, ParsingError
 from .parameters import (
@@ -161,14 +162,13 @@ class Command:
         except AttributeError:
             pass
 
-    def _extract_signature(self) -> None:
-        self._signature: Signature = signature(self.function)
+    def _extract_signature(self) -> list[CommandParameter]:
         annotations: dict[str, Any] = get_type_hints(self.function, include_extras=True)
-        self._parameters: list[CommandParameter] = [
+        return [
             CommandParameter.build(
                 p.name, p.kind, annotations.get(p.name, str), default=p.default
             )
-            for p in self._signature.parameters.values()
+            for p in signature(self.function).parameters.values()
         ]
 
     def _generate_details(self) -> None:
@@ -185,7 +185,7 @@ class Command:
     def __post_init__(self) -> None:
         self._validate_data()
         self._attach_self()
-        self._extract_signature()
+        self._parameters: list[CommandParameter] = self._extract_signature()
         self._generate_details()
         self._callback_futures()
 
@@ -243,6 +243,14 @@ class Command:
         return self.details
 
 
+@dataclass
+class CustomSignatureExtractorCommand(Command, ABC):
+    @override
+    @abstractmethod
+    def _extract_signature(self) -> list[CommandParameter]:
+        pass
+
+
 def is_cmd(function: Callable[..., Any]) -> bool:
     return hasattr(function, Command.__CMD_ATTR__)
 
@@ -261,6 +269,18 @@ def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) 
     if not hasattr(function, Command.__CMD_HOOKS_ATTR__):
         setattr(function, Command.__CMD_HOOKS_ATTR__, [])
     getattr(function, Command.__CMD_HOOKS_ATTR__).append(callback)
+
+
+def custom_signature_extractor(
+    extractor: Callable[[Command], list[CommandParameter]],
+) -> type[Command]:
+    @dataclass
+    class CustomExtractor(CustomSignatureExtractorCommand):
+        @override
+        def _extract_signature(self) -> list[CommandParameter]:
+            return extractor(self)
+
+    return CustomExtractor
 
 
 __all__ = ["Command", "cmd", "cmd_hook", "is_cmd"]
