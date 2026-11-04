@@ -7,7 +7,28 @@ from .errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
 from .parameters import Parsers
 
 
+class RaiseExpectionSentinelType:
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "<Raise Exception Sentinel>"
+
+    def __setattr__(self, name: str, value: Any):
+        raise AttributeError("This sentinel instance is immutable.")
+
+    def __delattr__(self, name: str):
+        raise AttributeError("This sentinel instances is immutable.")
+
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo: Any):
+        return self
+
+
 class CLI:
+    RAISE: RaiseExpectionSentinelType = RaiseExpectionSentinelType()
+
     def __init__(
         self,
         title: str | None = None,
@@ -142,12 +163,13 @@ class CLI:
         try:
             retval: Any = command(entries, self.parsers)
             if self._retval_handler is not None:
-                return self._retval_handler(command, retval)
+                retval = self._retval_handler(command, retval)
         except CLIError as cli_error:
             if self._error_handler is None:
                 cli_error.cli = self
                 raise
-            return self._error_handler(command, cli_error)
+            if (retval := self._error_handler(command, cli_error)) is CLI.RAISE:
+                raise
         except Exception as error:
             if self._error_handler is None:
                 raise CLIError(
@@ -155,7 +177,8 @@ class CLI:
                     cli=self,
                     command=command,
                 ) from error
-            return self._error_handler(command, error)
+            if (retval := self._error_handler(command, error)) is CLI.RAISE:
+                raise
 
         return retval
 

@@ -29,17 +29,23 @@ def retvals(command: Command, return_value: Optional[Any]) -> Optional[Any]:
 
 To handle raised exceptions, write a *callback* function that will take as arguments the `Command` the exception was
 raised in, and the `Exception` itself.
-This function may be used to provide a return value for the caller of `CLI.exec`, otherwise errors `return None`
+This function may be used to provide a return value for the caller of `CLI.exec` _or_ still raise the exception back to
+that call-site by returning sentinel `CLI.RAISE`.
 
-This exception handler will simply print the exception. The return value of
-the handler will be returned to the caller of `cli.exec(..)` or `cli.prompt`, so in this case, `None` is always returned.
+This exception handler will simply print the exception before it gets re-raised. The return value of the handler will be
+returned to the caller of `cli.exec(..)` or `cli.prompt`, so in this case, `None` is always returned.
 
 
 ```python
 @cli.errors()
 def errors(command: Command, exception: Exception) -> None:
     print(f'A {exception.__class__.__name__} error occurred executing {command.name}:\n{exception}')
+    if isinstance(exception, CLIError):
+        return
+    return CLI.RAISE
 ```
 
-***Note:** the `@cli.errors()` handler will not be called if an exception is thrown by `cli.prompt()` or `cli.exec()`, Optional
-if the exception is raised while **executing** the command or the `retvals`.*
+**Note:** The `@cli.errors()` handler will be invoked if any exceptions get raised in the frame of `cli.exec`
+**except for `EmptyEntriesError` or `CommandDoesNotExistError`,** these _must_ be handled by the call-site. It's
+probably a good idea to always return `CLI.RAISE` unless it is certain how the call-site of `cli.exec`/`cli.prompt`
+handles return values.
