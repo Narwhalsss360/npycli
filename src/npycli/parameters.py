@@ -105,6 +105,9 @@ type BypassParse = str
 type CommandParameterType = type | TypeAliasType | GenericAlias
 
 
+type Parsers = dict[CommandParameterType, Callable[[str], Any]]
+
+
 @dataclass
 class CommandParameter:
     UNPARSED = object()
@@ -511,7 +514,7 @@ def default_err_parse_hook(_: str, exc: Exception) -> Any | Exception:
 def parse_with_hooks(
     parameter: CommandParameter,
     entry: str,
-    parsers: dict[CommandParameterType, Callable[[str], Any]],
+    parsers: Parsers,
 ) -> Any:
     pre: Callable[[str], str] = default_pre_parse_hook
     post: Callable[[Any], Any] = default_post_parse_hook
@@ -619,11 +622,11 @@ class CommandParameterParser:
         self,
         keyword_prefix: str,
         argument_separator: str,
-        parsers: dict[CommandParameterType, Callable[[str], Any]],
+        parsers: Parsers,
     ) -> None:
         self.keyword_prefix: str = keyword_prefix
         self.argument_separator: str = argument_separator
-        self.parsers: dict[CommandParameterType, Callable[[str], Any]] = parsers
+        self.parsers: Parsers = parsers
 
     def _next_keyword(
         self,
@@ -868,7 +871,7 @@ def parse_parameters(
     entries: list[str],
     keyword_prefix: str,
     argument_separator: str,
-    parsers: dict[CommandParameterType, Callable[[str], Any]],
+    parsers: Parsers,
 ) -> tuple[list[Any], dict[str, Any]]:
     return CommandParameterParser(keyword_prefix, argument_separator, parsers).parse(
         parameters, entries

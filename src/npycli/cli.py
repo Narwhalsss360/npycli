@@ -4,7 +4,7 @@ from typing import Any
 
 from .command import Command
 from .errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
-from .parameters import CommandParameterType
+from .parameters import Parsers
 
 
 class CLI:
@@ -13,7 +13,7 @@ class CLI:
         title: str | None = None,
         prompt_marker: str | None = None,
         kwarg_prefix: str | None = None,
-        parsers: dict[CommandParameterType, Callable[[str], Any]] | None = None,
+        parsers: Parsers | None = None,
         env: dict[Any, Any] | None = None,
         retval_handler: Callable[[Command, Any], Any] | None = None,
         error_handler: Callable[[Command, Exception], Any] | None = None,
@@ -21,7 +21,7 @@ class CLI:
         self.title: str = title or "CLI"
         self.prompt_marker: str = prompt_marker or ">"
         self.kwarg_prefix: str = kwarg_prefix or "--"
-        self.parsers: dict[CommandParameterType, Callable[[str], Any]] = parsers or {}
+        self.parsers: Parsers = parsers or {}
         self.env: dict[Any, Any] = env or {}
         self._retval_handler: Callable[[Command, Any], Any] | None = retval_handler
         self._error_handler: Callable[[Command, Exception], Any] | None = error_handler

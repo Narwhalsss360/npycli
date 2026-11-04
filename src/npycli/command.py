@@ -8,8 +8,8 @@ from typing import Any, get_type_hints
 from .errors import CommandArgumentError, ParsingError
 from .parameters import (
     CommandParameter,
-    CommandParameterType,
     ParameterKind,
+    Parsers,
     parse_parameters,
 )
 
@@ -102,7 +102,7 @@ class Command:
     def exec_with(
         self,
         entries: list[str],
-        parsers: dict[CommandParameterType, Callable[[str], Any]] | None = None,
+        parsers: Parsers | None = None,
     ) -> Any:
         """
         Execute this `Command` with specified arguments and parsers
@@ -235,7 +235,7 @@ class Command:
     def __call__(
         self,
         args: list[str] | None = None,
-        parsers: dict[CommandParameterType, Callable[[str], Any]] | None = None,
+        parsers: Parsers | None = None,
     ) -> Any:
         return self.exec_with(args or [], parsers)
 
