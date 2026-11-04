@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from shlex import split
 from typing import Any
 
@@ -147,7 +147,7 @@ class CLI:
 
         return decorator
 
-    def exec(self, entries: list[str]) -> Any:
+    def exec(self, entries: Sequence[str]) -> Any:
         """
         Execute a command from specified `entries`.
         :param entries: Command name and arguments.
@@ -156,12 +156,12 @@ class CLI:
 
         if not entries:
             raise EmptyEntriesError("Nothing was entered.", cli=self)
-        name: str = entries.pop(0)
+        name: str = entries[0]
         if (command := self.get_command(name)) is None:
             raise CommandDoesNotExistError(f"Command {name} does not exist.", cli=self)
 
         try:
-            retval: Any = command(entries, self.parsers)
+            retval: Any = command(entries[1:], self.parsers)
             if self._retval_handler is not None:
                 retval = self._retval_handler(command, retval)
         except CLIError as cli_error:

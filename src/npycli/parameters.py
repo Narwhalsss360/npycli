@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from inspect import Parameter, _ParameterKind  # type: ignore
 from types import GenericAlias, NoneType, UnionType
 from typing import (
     Annotated,
     Any,
+    ClassVar,
     Literal,
+    Self,
     TypeAliasType,
     Union,
     get_args,
     get_origin,
 )
+from weakref import WeakKeyDictionary
 
 from .errors import MissingKeywordArgumentValueError, ParsingError
 
@@ -108,8 +111,34 @@ type CommandParameterType = type | TypeAliasType | GenericAlias
 type Parsers = dict[CommandParameterType, Callable[[str], Any]]
 
 
-@dataclass
+class CommandParameterAttributes:
+    def __init__(self) -> None:
+        self._custom_attributes: dict[str, Any] = {}
+
+    @property
+    def custom_attributes(self) -> Mapping[str, Any]:
+        return self._custom_attributes
+
+    def add_custom_attribute(
+        self, key: str, value: Any, overwrite: bool = False
+    ) -> Self:
+        if key in self._custom_attributes and not overwrite:
+            raise KeyError(
+                f"Key {key} already exists for command parameter custom attribute and overwrite is False."
+            )
+        self._custom_attributes[key] = value
+        return self
+
+    def pop_custom_attribute(self, key: str) -> Any:
+        return self._custom_attributes.pop(key)
+
+
+@dataclass(frozen=True)
 class CommandParameter:
+    __mutable_attributes__: ClassVar[
+        WeakKeyDictionary[CommandParameter, CommandParameterAttributes]
+    ] = WeakKeyDictionary()
+
     UNPARSED = object()
     DEFAULT_ARG_TYPES = (str,)
     DEFAULT_STR = ""
@@ -124,11 +153,12 @@ class CommandParameter:
     default_preview: str = field(default=DEFAULT_STR)
     description: str = field(default=DEFAULT_STR)
     parse_hooks: ParseHooks | None = field(default=None)
+    container_annotation: Any | None = field(default=None)
+    item_types: tuple[CommandParameterType, ...] | None = field(default=None)
+    _private_name: str | None = field(default=None)
 
     def __post_init__(self) -> None:
-        self._custom_attributes: dict[str, Any] = {}
-        self._container_annotation: Any | None = None
-        self._private_name: str | None = None
+        CommandParameter.__mutable_attributes__[self] = CommandParameterAttributes()
         self.validate_data()
 
     @staticmethod
@@ -157,8 +187,8 @@ class CommandParameter:
         )
 
     @property
-    def custom_attributes(self) -> dict[str, Any]:
-        return self._custom_attributes
+    def custom_attributes(self) -> Mapping[str, Any]:
+        return CommandParameter.__mutable_attributes__[self].custom_attributes
 
     @property
     def argument_type(self) -> CommandParameterType:
@@ -166,31 +196,9 @@ class CommandParameter:
 
     @property
     def container_type(self) -> type[ContainerTypes] | None:
-        if self._container_annotation is None:
+        if self.container_annotation is None:
             return None
-        return get_origin(self._container_annotation)
-
-    @property
-    def item_types(self) -> tuple[CommandParameterType, ...] | None:
-        if self._container_annotation is None:
-            return None
-        if not (args := get_args(self._container_annotation)):
-            return (str,)
-
-        if get_origin(self._container_annotation) is tuple:
-            if len(args) != 2 or args[1] is not Ellipsis:
-                raise TypeError(
-                    "Ellipsis required for second generic argument of tuples"
-                )
-            args = (args[0],)
-        elif len(args) != 1:
-            raise TypeError(
-                "Only single argument generic container types are supported"
-            )
-
-        if isinstance(args[0], UnionType) or args[0] == Union:
-            return get_args(args[0])
-        return args
+        return get_origin(self.container_annotation)
 
     @property
     def bypasses_parsing(self) -> bool:
@@ -198,10 +206,11 @@ class CommandParameter:
 
     def add_custom_attribute(
         self, key: str, value: Any, overwrite: bool = False
-    ) -> None:
-        if not overwrite and key in self._custom_attributes:
-            raise KeyError(f"Key {key} already exists and overwrite is False")
-        self._custom_attributes[key] = value
+    ) -> Self:
+        CommandParameter.__mutable_attributes__[self].add_custom_attribute(
+            key, value, overwrite
+        )
+        return self
 
     @staticmethod
     def type_name(t: CommandParameterType) -> str:
@@ -306,15 +315,37 @@ class CommandParameter:
         return out
 
     def remove_custom_attribute(self, key: str) -> Any:
-        return self._custom_attributes.pop(key)
+        return CommandParameter.__mutable_attributes__[self].pop_custom_attribute(key)
 
     def validate_data(self) -> None:
         assert len(self.names), "Parameters must have at least 1 name"
         assert len(self.argument_types), "Parameters must have at least 1 type"
 
 
+def container_annotation_item_types(
+    container_annotation: Any,
+) -> tuple[CommandParameterType, ...] | None:
+    if container_annotation is None:
+        return None
+    if not (args := get_args(container_annotation)):
+        return (str,)
+
+    if get_origin(container_annotation) is tuple:
+        if len(args) != 2 or args[1] is not Ellipsis:
+            raise TypeError("Ellipsis required for second generic argument of tuples")
+        args = (args[0],)
+    elif len(args) != 1:
+        raise TypeError("Only single argument generic container types are supported")
+
+    if isinstance(args[0], UnionType) or args[0] == Union:
+        return get_args(args[0])
+    return args
+
+
 class CommandParameterBuilder:
-    DEFAULT_NAMES: tuple[str] = ("",)
+    DEFAULT_STR: str = ""
+    DEFAULT_NAMES: ClassVar[list[str]] = [""]
+    DEFAULT_ARG_TYPES: ClassVar[list[CommandParameterType]] = [str]
 
     def __init__(
         self,
@@ -329,17 +360,28 @@ class CommandParameterBuilder:
             )
 
         self._name: str = name
-        self._kind: ParameterKind = kind
-        self._default: Any = default
-        self._parameter: CommandParameter = CommandParameter(
-            CommandParameterBuilder.DEFAULT_NAMES, kind, annotation, default=default
+        self._parameter_names: list[str] = CommandParameterBuilder.DEFAULT_NAMES
+        self._parameter_kind: ParameterKind = kind
+        self._parameter_annotation: Any = annotation
+        self._parameter_annotation_preview: str = CommandParameterBuilder.DEFAULT_STR
+        self._parameter_argument_types: list[CommandParameterType] = (
+            CommandParameterBuilder.DEFAULT_ARG_TYPES
         )
+        self._parameter_default: Any = default
+        self._parameter_default_preview: str = CommandParameterBuilder.DEFAULT_STR
+        self._parameter_description: str = CommandParameterBuilder.DEFAULT_STR
+        self._parameter_parse_hooks: ParseHooks | None = None
+        self._parameter_container_annotation: Any | None = None
+        self._parameter_item_types: list[CommandParameterType] | None = None
+        self._custom_attributes: dict[str, Any] = {}
+        self._private_name: str = name
+
         self._has_bypass: bool = False
         self._appending_mode: bool = False
-        self._built: bool = False
+        self._built_parameter: CommandParameter | None = None
 
         if annotation is CommandParameter.empty:
-            self._parameter.names = (name,)
+            self._parameter_names = [name]
         elif (
             isinstance(annotation, TypeAliasType)
             and get_origin(annotation.__value__) is Annotated
@@ -358,22 +400,24 @@ class CommandParameterBuilder:
 
     def _next_metadata_annotation(self, annotation: Any) -> None:
         if isinstance(annotation, Alias):
-            self._parameter.names = (
-                () if annotation.private else (self._name,)
-            ) + annotation.aliases
-            self._parameter._private_name = self._name  # pyright: ignore [reportPrivateUsage]
+            if not annotation.private:
+                self._parameter_names.insert(0, self._name)
+            self._parameter_names.extend(annotation.aliases)
+            self._private_name = self._name
         elif isinstance(annotation, Description):
-            self._parameter.description = annotation.description
+            self._parameter_description = annotation.description
         elif isinstance(annotation, AnnotationPreview):
-            self._parameter.annotation_preview = annotation.annotation_preview
+            self._parameter_annotation_preview = annotation.annotation_preview
         elif isinstance(annotation, DefaultPreview):
-            self._parameter.default_preview = annotation.default_preview
+            self._parameter_default_preview = annotation.default_preview
         elif isinstance(annotation, ParseHooks):
-            self._parameter.parse_hooks = annotation
+            self._parameter_parse_hooks = annotation
         elif isinstance(annotation, CustomAttribute):
-            self._parameter.add_custom_attribute(
-                annotation.key, annotation.value, annotation.overwrite
-            )
+            if not annotation.overwrite and annotation.key in self._custom_attributes:
+                raise KeyError(
+                    f"Key {annotation.key} already exists for command parameter custom attribute and overwrite is False."
+                )
+            self._custom_attributes[annotation.key] = annotation.value
         else:
             raise TypeError(f"{annotation} is unsupported")
 
@@ -386,13 +430,14 @@ class CommandParameterBuilder:
         if isinstance(annotation, type):
             if (
                 not self._appending_mode
-                or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES
+                or self._parameter_argument_types
+                is CommandParameterBuilder.DEFAULT_ARG_TYPES
             ):
-                self._parameter.argument_types = (annotation,)
+                self._parameter_argument_types = [annotation]
             else:
-                self._parameter.argument_types = self._parameter.argument_types + (
-                    annotation,
-                )
+                self._parameter_argument_types = self._parameter_argument_types + [
+                    annotation
+                ]
             return
 
         if isinstance(annotation, TypeAliasType):
@@ -400,27 +445,35 @@ class CommandParameterBuilder:
             return
 
         if (origin := get_origin(annotation)) in CONTAINER_TYPES:
-            if self._kind not in (
-                self._parameter.kind.KEYWORD_ONLY,
+            if self._parameter_kind not in (
+                self._parameter_kind.KEYWORD_ONLY,
                 ParameterKind.VAR_KEYWORD,
             ):
                 raise TypeError(
                     f"A container argument type must be either {ParameterKind.KEYWORD_ONLY} {ParameterKind.VAR_KEYWORD}"
                 )
-            self._parameter.argument_types = (origin,)
-            self._parameter._container_annotation = annotation  # pyright: ignore [reportPrivateUsage]
-            item_types: tuple[CommandParameterType, ...] | None = (
-                self._parameter.item_types
+            self._parameter_argument_types = [origin]
+            self._parameter_container_annotation = annotation  # pyright: ignore [reportPrivateUsage]
+            self._parameter_item_types = (
+                list(types)
+                if (
+                    types := container_annotation_item_types(
+                        self._parameter_container_annotation
+                    )
+                )
+                is not None
+                else None
             )
-            assert item_types is not None, (
+            assert self._parameter_item_types is not None, (
                 "Shall not be None of _container_annotation is not None"
             )
 
             if not all(
-                isinstance(item_type, (type, TypeAliasType)) for item_type in item_types
+                isinstance(item_type, (type, TypeAliasType))
+                for item_type in self._parameter_item_types
             ):
                 raise TypeError(
-                    f"{item_types} is not supported as item types for containers, only {CommandParameterType}."
+                    f"{container_annotation_item_types} is not supported as item types for containers, only {CommandParameterType}."
                 )
             return
 
@@ -443,60 +496,84 @@ class CommandParameterBuilder:
         if get_origin(annotation) == Literal:
             if (
                 not self._appending_mode
-                or self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES
+                or self._parameter_argument_types
+                is CommandParameterBuilder.DEFAULT_ARG_TYPES
             ):
-                self._parameter.argument_types = (annotation,)
+                self._parameter_argument_types = [annotation]
             else:
-                self._parameter.argument_types = self._parameter.argument_types + (
-                    annotation,
-                )
+                self._parameter_argument_types = self._parameter_argument_types + [
+                    annotation
+                ]
             return
 
         raise TypeError(f"{annotation} is unsupported")
 
     def _next_type_alias(self, annotation: TypeAliasType) -> None:
         if annotation is BypassParse:
-            if self._kind != self._parameter.kind.VAR_POSITIONAL:
+            if self._parameter_kind != self._parameter_kind.VAR_POSITIONAL:
                 raise TypeError(
                     f"{BypassParse.__name__} self._parameter.kind must be VAR_POSITIONAL"
                 )
-            if self._default is not self._parameter.empty:
+            if self._parameter_default is not CommandParameter.empty:
                 raise TypeError(
                     f"{BypassParse.__name__} self._parameter.must be empty, it will always be provided."
                 )
             self._has_bypass = True
-            self._parameter.argument_types = (BypassParse,)
+            self._parameter_argument_types = [BypassParse]
             return
 
-        if self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
-            self._parameter.argument_types = (annotation,)
+        if self._parameter_argument_types is CommandParameterBuilder.DEFAULT_ARG_TYPES:
+            self._parameter_argument_types = [annotation]
         else:
-            self._parameter.argument_types = self._parameter.argument_types + (
-                annotation,
-            )
+            self._parameter_argument_types = self._parameter_argument_types + [
+                annotation
+            ]
 
         self._appending_mode = True
         self._next_annotation(annotation.__value__)
 
     def _next_generic_alias(self, annotation: GenericAlias) -> None:
-        if self._parameter.argument_types is CommandParameter.DEFAULT_ARG_TYPES:
-            self._parameter.argument_types = (annotation,)
+        if self._parameter_argument_types is CommandParameterBuilder.DEFAULT_ARG_TYPES:
+            self._parameter_argument_types = [annotation]
         else:
-            self._parameter.argument_types = self._parameter.argument_types + (
-                annotation,
-            )
+            self._parameter_argument_types = self._parameter_argument_types + [
+                annotation
+            ]
 
     @property
     def parameter(self) -> CommandParameter:
-        if self._built:
-            return self._parameter
+        if self._built_parameter is not None:
+            return self._built_parameter
 
-        self._built = True
-        if self._parameter.names is CommandParameterBuilder.DEFAULT_NAMES:
-            self._parameter.names = (self._name,)
+        if self._parameter_names is CommandParameterBuilder.DEFAULT_NAMES:
+            self._parameter_names = [self._name]
 
-        self._parameter.validate_data()  # pyright: ignore [reportPrivateUsage]
-        return self._parameter
+        self._built_parameter = CommandParameter(
+            names=tuple(self._parameter_names),
+            kind=self._parameter_kind,
+            annotation=self._parameter_annotation,
+            annotation_preview=CommandParameter.DEFAULT_STR
+            if self._parameter_annotation_preview is CommandParameterBuilder.DEFAULT_STR
+            else self._parameter_annotation_preview,
+            argument_types=CommandParameter.DEFAULT_ARG_TYPES
+            if self._parameter_argument_types
+            is CommandParameterBuilder.DEFAULT_ARG_TYPES
+            else tuple(self._parameter_argument_types),
+            default=self._parameter_default,
+            default_preview=CommandParameter.DEFAULT_STR
+            if self._parameter_default_preview is CommandParameterBuilder.DEFAULT_STR
+            else self._parameter_default_preview,
+            description=CommandParameter.DEFAULT_STR
+            if self._parameter_description is CommandParameterBuilder.DEFAULT_STR
+            else self._parameter_description,
+            parse_hooks=self._parameter_parse_hooks,
+            container_annotation=self._parameter_container_annotation,
+            _private_name=self._private_name,
+        )
+        for key, value in self._custom_attributes.items():
+            self._built_parameter.add_custom_attribute(key, value)
+
+        return self.parameter
 
 
 def default_pre_parse_hook(s: str) -> str:
@@ -601,7 +678,7 @@ def add_to_container_type(
 
 class CommandParameterParser:
     class Context:
-        def __init__(self, parameters: list[CommandParameter]) -> None:
+        def __init__(self, parameters: Sequence[CommandParameter]) -> None:
             self.arguments: list[Any] = []
             self.keyword_arguments: dict[str, Any] = {}
             self.var_args: CommandParameter | None = next(
@@ -631,9 +708,9 @@ class CommandParameterParser:
     def _next_keyword(
         self,
         context: CommandParameterParser.Context,
-        parameters: list[CommandParameter],
+        parameters: Sequence[CommandParameter],
         bypass_parse: bool,
-        entries: list[str],
+        entries: Sequence[str],
         i: int,
     ) -> None:
         entry: str = entries[i]
@@ -690,7 +767,7 @@ class CommandParameterParser:
     def _next_keyword_value(
         self,
         context: CommandParameterParser.Context,
-        entries: list[str],
+        entries: Sequence[str],
         i: int,
     ) -> None:
         assert context.keyword_parameter is not None
@@ -726,7 +803,7 @@ class CommandParameterParser:
     def _next_var_kwarg_value(
         self,
         context: CommandParameterParser.Context,
-        entries: list[str],
+        entries: Sequence[str],
         i: int,
     ) -> None:
         assert context.var_kwarg is not None
@@ -752,7 +829,7 @@ class CommandParameterParser:
     @staticmethod
     def _validate(
         context: CommandParameterParser.Context,
-        parameters: list[CommandParameter],
+        parameters: Sequence[CommandParameter],
     ) -> None:
         required_positionals: int = 0
         for i, parameter in enumerate(parameters):
@@ -792,7 +869,7 @@ class CommandParameterParser:
             )
 
     def parse(
-        self, parameters: list[CommandParameter], entries: list[str]
+        self, parameters: Sequence[CommandParameter], entries: Sequence[str]
     ) -> tuple[list[Any], dict[str, Any]]:
         context: CommandParameterParser.Context = CommandParameterParser.Context(
             parameters
@@ -867,8 +944,8 @@ class CommandParameterParser:
 
 
 def parse_parameters(
-    parameters: list[CommandParameter],
-    entries: list[str],
+    parameters: Sequence[CommandParameter],
+    entries: Sequence[str],
     keyword_prefix: str,
     argument_separator: str,
     parsers: Parsers,

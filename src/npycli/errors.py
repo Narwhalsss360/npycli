@@ -26,7 +26,9 @@ class TooManyArgumentsError(ParsingError):
 
 
 class CLIError(Exception):
-    def __init__(self, *args: Any, cli: CLI | None = None, command: Command | None = None) -> None:
+    def __init__(
+        self, *args: Any, cli: CLI | None = None, command: Command | None = None
+    ) -> None:
         super().__init__(*args)
         self.cli: CLI | None = cli
         self.command: Command | None = command

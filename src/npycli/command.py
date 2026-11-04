@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from inspect import Signature, getdoc, signature
-from typing import Any, get_type_hints
+from inspect import getdoc, signature
+from typing import Any, ClassVar, Self, get_type_hints
+from weakref import WeakKeyDictionary
 
 from .errors import CommandArgumentError, ParsingError
 from .parameters import (
@@ -13,13 +14,50 @@ from .parameters import (
     parse_parameters,
 )
 
+type ParameterExtractor = Callable[[Callable[..., Any]], tuple[CommandParameter, ...]]
 
-@dataclass
+
+def default_parameter_extractor(function: Callable[..., Any]) -> tuple[CommandParameter, ...]:
+    annotations: dict[str, Any] = get_type_hints(function, include_extras=True)
+    return tuple(
+        CommandParameter.build(parameter.name, parameter.kind, annotations.get(parameter.name, str), default=parameter.default)
+        for parameter in signature(function).parameters.values()
+    )
+
+
+type HelpExtractor = Callable[[str | None, Callable[..., Any], tuple[CommandParameter, ...]], str]
+
+
+def default_help_extractor(existing: str | None, function: Callable[..., Any], parameters: tuple[CommandParameter, ...]) -> str:
+    if existing is not None:
+        return existing
+    if (doc := getdoc(function)) is not None:
+        return doc
+    return function.__name__
+
+
+class CommandAttributes:
+    def __init__(self) -> None:
+        self._details: list[str] = []
+
+    def add_detail(self, detail: str) -> Self:
+        self._details.append(detail)
+        return self
+
+    @property
+    def details(self) -> list[str]:
+        return self.details
+
+
+@dataclass(frozen=True)
 class Command:
+    __mutable_attributes__: ClassVar[WeakKeyDictionary[Command, CommandAttributes]] = WeakKeyDictionary()
+
     __CMD_ATTR__ = "__cmd__"
     __CMD_HOOKS_ATTR__ = "__cmd_hooks__"
 
     function: Callable[..., Any]
+    parameters: tuple[CommandParameter, ...]
     names: tuple[str, ...]
     help: str | None = field(default=None)
     kwarg_prefix: str = field(default_factory=lambda: "--")
@@ -31,6 +69,8 @@ class Command:
         names: tuple[str, ...] | None = None,
         help: str | None = None,
         kwarg_prefix: str | None = None,
+        parameter_extractor: ParameterExtractor = default_parameter_extractor,
+        help_extractor: HelpExtractor = default_help_extractor
     ) -> Command:
         """
         Create a Command, wrapper for using either `name` or `names`
@@ -48,8 +88,13 @@ class Command:
             else:
                 names = (function.__name__,)
 
+        parameters: tuple[CommandParameter, ...] = parameter_extractor(function)
         return Command(
-            function=function, names=names, help=help, kwarg_prefix=kwarg_prefix or "--"
+            function=function,
+            parameters=parameters,
+            names=names,
+            help=help_extractor(help, function, parameters),
+            kwarg_prefix=kwarg_prefix or "--"
         )
 
     @property
@@ -83,25 +128,22 @@ class Command:
 
         return self.basic_command_help()
 
-    @property
-    def parameters(self) -> list[CommandParameter]:
-        return self._parameters
-
-    def add_detail(self, detail: str) -> None:
+    def add_detail(self, detail: str) -> Self:
         """
         Add details to this `Command`
         :param detail: Specific detail
         :return: `None`
         """
 
-        self._details.append(detail)
+        Command.__mutable_attributes__[self].add_detail(detail)
+        return self
 
     def find_parameter(self, parameter_name: str) -> CommandParameter | None:
-        return next(filter(lambda p: parameter_name in p.names, self._parameters), None)
+        return next(filter(lambda p: parameter_name in p.names, self.parameters), None)
 
     def exec_with(
         self,
-        entries: list[str],
+        entries: Sequence[str],
         parsers: Parsers | None = None,
     ) -> Any:
         """
@@ -113,7 +155,7 @@ class Command:
 
         try:
             args, kwargs = parse_parameters(
-                self._parameters,
+                self.parameters,
                 entries,
                 self.kwarg_prefix,
                 self.kwarg_prefix,
@@ -161,21 +203,6 @@ class Command:
         except AttributeError:
             pass
 
-    def _extract_signature(self) -> None:
-        self._signature: Signature = signature(self.function)
-        annotations: dict[str, Any] = get_type_hints(self.function, include_extras=True)
-        self._parameters: list[CommandParameter] = [
-            CommandParameter.build(
-                p.name, p.kind, annotations.get(p.name, str), default=p.default
-            )
-            for p in self._signature.parameters.values()
-        ]
-
-    def _generate_details(self) -> None:
-        self._details: list[str] = []
-        if self.help is None and (doc := getdoc(self.function)) is not None:
-            self.help = doc
-
     def _callback_futures(self) -> None:
         if not hasattr(self.function, Command.__CMD_HOOKS_ATTR__):
             return
@@ -183,10 +210,9 @@ class Command:
             callback(self)
 
     def __post_init__(self) -> None:
+        Command.__mutable_attributes__[self] = CommandAttributes()
         self._validate_data()
         self._attach_self()
-        self._extract_signature()
-        self._generate_details()
         self._callback_futures()
 
     def _is_argument_error(self, type_error: TypeError) -> bool:
@@ -227,17 +253,17 @@ class Command:
         if self.help:
             out += f"\nDesciption: {self.help}"
 
-        for detail in self._details:
+        for detail in Command.__mutable_attributes__[self].details:
             out += f"\n->{detail}"
 
         return out
 
     def __call__(
         self,
-        args: list[str] | None = None,
+        args: Sequence[str] | None = None,
         parsers: Parsers | None = None,
     ) -> Any:
-        return self.exec_with(args or [], parsers)
+        return self.exec_with(args or (), parsers)
 
     def __str__(self) -> str:
         return self.details

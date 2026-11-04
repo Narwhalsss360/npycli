@@ -59,7 +59,7 @@ async def main(
             )
 
     async with ClientSession() as session:
-        values: tuple[str] = await gather(
+        values: list[str] = await gather(
             *[fetch_string(session, build_gh_gitignore_url(name)) for name in templates]
         )
 

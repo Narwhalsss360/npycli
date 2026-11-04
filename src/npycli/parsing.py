@@ -162,5 +162,5 @@ __all__ = [
     "create_literal_parser",
     "extract_positionals_keywords",
     "parse_args_as",
-    "type_from_annotation"
+    "type_from_annotation",
 ]
