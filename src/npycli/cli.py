@@ -1,10 +1,33 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Sequence
 from shlex import split
-from typing import Any
+from typing import Any, Self
 
 from .command import Command
 from .errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
+from .middleware import (
+    CommandExecutionInfoMiddlewareResult,
+    CommandForMiddlewareHandler,
+    CommandForMiddlewareHandlerInfo,
+    ErrorMiddlewareHandler,
+    ErrorMiddlewareHandlerInfo,
+    ExecutorMiddlewareHandler,
+    ExecutorMiddlewareHandlerInfo,
+    ExecutorMiddlewareResult,
+    MiddlewareContext,
+    PromptMiddlewareHandler,
+    PromptMiddlewareHandlerInfo,
+    ReturnValueMiddlewareHandler,
+    ReturnValueMiddlewareHandlerInfo,
+    SplitMiddlewareHandler,
+    SplitMiddlewareHandlerInfo,
+)
 from .parameters import Parsers
+
+type ReturnValueHandler = Callable[[Command, Any], Any]
+
+type ErrorHandler = Callable[[Command, Exception], Any]
 
 
 class RaiseExpectionSentinelType:
@@ -29,6 +52,284 @@ class RaiseExpectionSentinelType:
 class CLI:
     RAISE: RaiseExpectionSentinelType = RaiseExpectionSentinelType()
 
+    class MiddlewareManager:
+        def __init__(self, cli: CLI) -> None:
+            self._cli: CLI = cli
+            self._prompt_middleware_handler_info: PromptMiddlewareHandlerInfo = (
+                PromptMiddlewareHandlerInfo(
+                    CLI.MiddlewareManager.default_prompter, MiddlewareContext(self.cli)
+                )
+            )
+            self._split_middleware_handler_info: SplitMiddlewareHandlerInfo = (
+                SplitMiddlewareHandlerInfo(
+                    CLI.MiddlewareManager.default_splitter, MiddlewareContext(self.cli)
+                )
+            )
+            self._command_execution_info_handler_handler_info: CommandForMiddlewareHandlerInfo = CommandForMiddlewareHandlerInfo(
+                CLI.MiddlewareManager.default_command_execution_info,
+                MiddlewareContext(self.cli),
+            )
+            self._executor_middleware_handler_info: ExecutorMiddlewareHandlerInfo = (
+                ExecutorMiddlewareHandlerInfo(
+                    CLI.MiddlewareManager.default_executor, MiddlewareContext(self.cli)
+                )
+            )
+            self._error_middleware_handler_info: ErrorMiddlewareHandlerInfo = (
+                ErrorMiddlewareHandlerInfo(
+                    CLI.MiddlewareManager.default_error_handler,
+                    MiddlewareContext(self.cli),
+                )
+            )
+            self._return_value_middleware_handler_info: ReturnValueMiddlewareHandlerInfo = ReturnValueMiddlewareHandlerInfo(
+                CLI.MiddlewareManager.default_return_value_handler,
+                MiddlewareContext(self.cli),
+            )
+
+        @property
+        def cli(self) -> CLI:
+            return self._cli
+
+        @staticmethod
+        def default_prompter(_: MiddlewareContext, prompt: str) -> str:
+            return input(prompt)
+
+        def set_prompt_middleware(self, prompter: PromptMiddlewareHandler) -> Self:
+            self._prompt_middleware_handler_info.handler = prompter
+            return self
+
+        def prompt(self, prompt: str) -> str:
+            return self._prompt_middleware_handler_info.handler(
+                self._prompt_middleware_handler_info.context, prompt
+            )
+
+        @staticmethod
+        def default_splitter(_: MiddlewareContext, entry: str) -> list[str]:
+            return split(entry)
+
+        def set_split_middleware(self, splitter: SplitMiddlewareHandler) -> Self:
+            self._split_middleware_handler_info.handler = splitter
+            return self
+
+        def split(self, s: str) -> Sequence[str]:
+            return self._split_middleware_handler_info.handler(
+                self._split_middleware_handler_info.context, s
+            )
+
+        @staticmethod
+        def default_command_execution_info(
+            context: MiddlewareContext, entries: Sequence[str]
+        ) -> CommandExecutionInfoMiddlewareResult:
+            return CommandExecutionInfoMiddlewareResult(
+                context.cli.get_command(entries[0]) if entries else None, entries[1:]
+            )
+
+        def set_command_execution_info_middleware(
+            self, command_execution_info: CommandForMiddlewareHandler
+        ) -> Self:
+            self._command_execution_info_handler_handler_info.handler = (
+                command_execution_info
+            )
+            return self
+
+        def wrap_command_execution_info_middleware(
+            self, command_execution_info: CommandForMiddlewareHandler
+        ) -> Self:
+            if (
+                self._command_execution_info_handler_handler_info.handler
+                is self.default_command_execution_info
+            ):
+                return self.set_command_execution_info_middleware(
+                    command_execution_info
+                )
+
+            def wrapper(
+                context: MiddlewareContext, entries: Sequence[str]
+            ) -> CommandExecutionInfoMiddlewareResult:
+                previous_result: CommandExecutionInfoMiddlewareResult = (
+                    self._command_execution_info_handler_handler_info.handler(
+                        context, entries
+                    )
+                )
+                return command_execution_info(
+                    MiddlewareContext(
+                        self.cli,
+                        context.base_result
+                        if context.base_result is not context.DNE
+                        else previous_result,
+                        previous_result,
+                    ),
+                    entries,
+                )
+
+            self._command_execution_info_handler_handler_info.handler = wrapper
+            return self
+
+        def command_execution_info(
+            self, entries: Sequence[str]
+        ) -> CommandExecutionInfoMiddlewareResult:
+            return self._command_execution_info_handler_handler_info.handler(
+                self._command_execution_info_handler_handler_info.context, entries
+            )
+
+        @staticmethod
+        def default_executor(
+            _: MiddlewareContext,
+            command: Command,
+            entries: Sequence[str],
+            parsers: Parsers,
+        ) -> ExecutorMiddlewareResult:
+            return ExecutorMiddlewareResult(
+                command, command.exec_with(entries, parsers)
+            )
+
+        @staticmethod
+        def executor_wrapper_base(
+            _: MiddlewareContext,
+            command: Command,
+            entries: Sequence[str],
+            parsers: Parsers,
+        ) -> ExecutorMiddlewareResult:
+            return ExecutorMiddlewareResult(
+                command, command.exec_with(entries, parsers)
+            )
+
+        def set_executor_middleware(self, executor: ExecutorMiddlewareHandler) -> Self:
+            self._executor_middleware_handler_info.handler = executor
+            return self
+
+        def wrap_executor_middleware(self, executor: ExecutorMiddlewareHandler) -> Self:
+            if self._executor_middleware_handler_info.handler is self.default_executor:
+                return self.set_executor_middleware(executor)
+
+            def wrapper(
+                context: MiddlewareContext,
+                command: Command,
+                entries: Sequence[str],
+                parsers: Parsers,
+            ) -> ExecutorMiddlewareResult:
+                previous_result: ExecutorMiddlewareResult = (
+                    self._executor_middleware_handler_info.handler(
+                        context, command, entries, parsers
+                    )
+                )
+                return executor(
+                    MiddlewareContext(
+                        self.cli,
+                        context.base_result
+                        if context.base_result is not context.DNE
+                        else previous_result,
+                        previous_result,
+                    ),
+                    previous_result.command_executed,
+                    entries,
+                    parsers,
+                )
+
+            self._executor_middleware_handler_info.handler = wrapper
+            return self
+
+        def executor(
+            self, command: Command, entries: Sequence[str], parsers: Parsers
+        ) -> ExecutorMiddlewareResult:
+            return self._executor_middleware_handler_info.handler(
+                self._executor_middleware_handler_info.context,
+                command,
+                entries,
+                parsers,
+            )
+
+        @staticmethod
+        def default_error_handler(
+            _: MiddlewareContext, command: Command, error: Exception
+        ) -> Any:
+            return CLI.RAISE
+
+        def set_error_middleware(self, error_handler: ErrorMiddlewareHandler) -> Self:
+            self._error_middleware_handler_info.handler = error_handler
+            return self
+
+        def wrap_error_middleware(self, error_handler: ErrorMiddlewareHandler) -> Self:
+            if (
+                self._error_middleware_handler_info.handler
+                is self.default_error_handler
+            ):
+                return self.set_error_middleware(error_handler)
+
+            def wrapper(
+                context: MiddlewareContext, command: Command, error: Exception
+            ) -> Any:
+                previous_result: ErrorMiddlewareHandler = (
+                    self._error_middleware_handler_info.handler(context, command, error)
+                )
+                return error_handler(
+                    MiddlewareContext(
+                        self.cli,
+                        context.base_result
+                        if context.base_result is not context.DNE
+                        else previous_result,
+                        previous_result,
+                    ),
+                    command,
+                    error,
+                )
+
+            self._error_middleware_handler_info.handler = wrapper
+            return self
+
+        def error(self, command: Command, error: Exception) -> Any:
+            return self._error_middleware_handler_info.handler(
+                self._error_middleware_handler_info.context, command, error
+            )
+
+        @staticmethod
+        def default_return_value_handler(
+            _: MiddlewareContext, command: Command, return_value: Any
+        ) -> Any:
+            return return_value
+
+        def set_return_value_middleware(
+            self, return_value_handler: ReturnValueMiddlewareHandler
+        ) -> Self:
+            self._return_value_middleware_handler_info.handler = return_value_handler
+            return self
+
+        def wrap_return_value_middleware(
+            self, return_value_handler: ReturnValueMiddlewareHandler
+        ) -> Self:
+            if (
+                self._return_value_middleware_handler_info.handler
+                is self.default_return_value_handler
+            ):
+                return self.set_return_value_middleware(return_value_handler)
+
+            def wrapper(
+                context: MiddlewareContext, command: Command, return_value: Any
+            ) -> Any:
+                previous_result: Any = (
+                    self._return_value_middleware_handler_info.handler(
+                        context, command, return_value
+                    ),
+                )
+                return return_value_handler(
+                    MiddlewareContext(
+                        self.cli,
+                        context.base_result is context.base_result is not context.DNE,
+                        previous_result,
+                    ),
+                    command,
+                    return_value,
+                )
+
+            self._return_value_middleware_handler_info.handler = wrapper
+            return self
+
+        def return_value(self, command: Command, return_value: Any) -> Any:
+            return self._return_value_middleware_handler_info.handler(
+                self._return_value_middleware_handler_info.context,
+                command,
+                return_value,
+            )
+
     def __init__(
         self,
         title: str | None = None,
@@ -36,17 +337,24 @@ class CLI:
         kwarg_prefix: str | None = None,
         parsers: Parsers | None = None,
         env: dict[Any, Any] | None = None,
-        retval_handler: Callable[[Command, Any], Any] | None = None,
-        error_handler: Callable[[Command, Exception], Any] | None = None,
+        retval_handler: ReturnValueHandler | None = None,
+        error_handler: ErrorHandler | None = None,
     ) -> None:
         self.title: str = title or "CLI"
         self.prompt_marker: str = prompt_marker or ">"
         self.kwarg_prefix: str = kwarg_prefix or "--"
         self.parsers: Parsers = parsers or {}
         self.env: dict[Any, Any] = env or {}
-        self._retval_handler: Callable[[Command, Any], Any] | None = retval_handler
-        self._error_handler: Callable[[Command, Exception], Any] | None = error_handler
         self._commands: list[Command] = []
+        self._middleware_manager: CLI.MiddlewareManager = CLI.MiddlewareManager(self)
+        if retval_handler is not None:
+            self.retvals()(retval_handler)
+        if error_handler is not None:
+            self.errors()(error_handler)
+
+    @property
+    def middlewares(self) -> MiddlewareManager:
+        return self._middleware_manager
 
     @property
     def commands(self) -> list[Command]:
@@ -126,7 +434,12 @@ class CLI:
         def decorator(
             function: Callable[[Command, Any], None],
         ) -> Callable[[Command, Any], None]:
-            self._retval_handler = function
+            def wrapper(
+                _: MiddlewareContext, command: Command, return_value: Any
+            ) -> Any:
+                return function(command, return_value)
+
+            self.middlewares.set_return_value_middleware(wrapper)
             return function
 
         return decorator
@@ -142,10 +455,20 @@ class CLI:
         def decorator(
             function: Callable[[Command, Exception], None],
         ) -> Callable[[Command, Exception], None]:
-            self._error_handler = function
+            def wrapper(
+                _: MiddlewareContext, command: Command, return_value: Any
+            ) -> Any:
+                return function(command, return_value)
+
+            self.middlewares.set_error_middleware(wrapper)
             return function
 
         return decorator
+
+    def command_execution_info(
+        self, entries: Sequence[str]
+    ) -> CommandExecutionInfoMiddlewareResult:
+        return self.middlewares.command_execution_info(entries)
 
     def exec(self, entries: Sequence[str]) -> Any:
         """
@@ -155,32 +478,39 @@ class CLI:
         """
 
         if not entries:
-            raise EmptyEntriesError("Nothing was entered.", cli=self)
-        name: str = entries[0]
-        if (command := self.get_command(name)) is None:
-            raise CommandDoesNotExistError(f"Command {name} does not exist.", cli=self)
+            command_execution_info: CommandExecutionInfoMiddlewareResult = (
+                self.command_execution_info(entries)
+            )
+            if (command := command_execution_info.command) is None:
+                raise EmptyEntriesError("Nothing was entered.", cli=self)
+        else:
+            command_execution_info: CommandExecutionInfoMiddlewareResult = (
+                self.command_execution_info(entries)
+            )
+            if (command := command_execution_info.command) is None:
+                raise CommandDoesNotExistError(
+                    f"Command {entries[0]} does not exist.", cli=self
+                )
 
         try:
-            retval: Any = command(entries[1:], self.parsers)
-            if self._retval_handler is not None:
-                retval = self._retval_handler(command, retval)
+            command, return_value = self._middleware_manager.executor(
+                command, entries[1:], self.parsers
+            )
+            return_value = self._middleware_manager.return_value(command, return_value)
         except CLIError as cli_error:
-            if self._error_handler is None:
-                cli_error.cli = self
-                raise
-            if (retval := self._error_handler(command, cli_error)) is CLI.RAISE:
+            if (
+                return_value := self.middlewares.error(command, cli_error)
+            ) is CLI.RAISE:
                 raise
         except Exception as error:
-            if self._error_handler is None:
+            if (return_value := self.middlewares.error(command, error)) is CLI.RAISE:
                 raise CLIError(
                     f"An exception was raised running {command.name}: {error}",
                     cli=self,
                     command=command,
                 ) from error
-            if (retval := self._error_handler(command, error)) is CLI.RAISE:
-                raise
 
-        return retval
+        return return_value
 
     def prompt(self) -> Any:
         """
@@ -188,7 +518,11 @@ class CLI:
         :return: Command function return value
         """
 
-        return self.exec(split(input(self.prompt_entry_marker)))
+        return self.exec(
+            self._middleware_manager.split(
+                self._middleware_manager.prompt(self.prompt_entry_marker)
+            )
+        )
 
 
 __all__ = ["CLI"]
