@@ -920,6 +920,12 @@ class CommandParameterParser:
                 )
 
             parameter: CommandParameter = parameters[len(context.arguments)]
+            if parameter.private_name in context.keyword_arguments:
+                raise ParsingError(
+                    entry,
+                    f"Argument for {parameter.private_name} was supplied positionally and as keyword argument.",
+                )
+
             if parameter.kind in (
                 ParameterKind.KEYWORD_ONLY,
                 ParameterKind.VAR_KEYWORD,
