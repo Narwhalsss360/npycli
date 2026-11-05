@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from inspect import getdoc, signature
 from typing import Any, ClassVar, Self, get_type_hints
-from weakref import WeakKeyDictionary
+from weakref import ReferenceType, WeakKeyDictionary, ref
 
 from .errors import CommandArgumentError, ParsingError
 from .parameters import (
@@ -17,18 +17,31 @@ from .parameters import (
 type ParameterExtractor = Callable[[Callable[..., Any]], tuple[CommandParameter, ...]]
 
 
-def default_parameter_extractor(function: Callable[..., Any]) -> tuple[CommandParameter, ...]:
+def default_parameter_extractor(
+    function: Callable[..., Any],
+) -> tuple[CommandParameter, ...]:
     annotations: dict[str, Any] = get_type_hints(function, include_extras=True)
     return tuple(
-        CommandParameter.build(parameter.name, parameter.kind, annotations.get(parameter.name, str), default=parameter.default)
+        CommandParameter.build(
+            parameter.name,
+            parameter.kind,
+            annotations.get(parameter.name, str),
+            default=parameter.default,
+        )
         for parameter in signature(function).parameters.values()
     )
 
 
-type HelpExtractor = Callable[[str | None, Callable[..., Any], tuple[CommandParameter, ...]], str]
+type HelpExtractor = Callable[
+    [str | None, Callable[..., Any], tuple[CommandParameter, ...]], str
+]
 
 
-def default_help_extractor(existing: str | None, function: Callable[..., Any], parameters: tuple[CommandParameter, ...]) -> str:
+def default_help_extractor(
+    existing: str | None,
+    function: Callable[..., Any],
+    parameters: tuple[CommandParameter, ...],
+) -> str:
     if existing is not None:
         return existing
     if (doc := getdoc(function)) is not None:
@@ -49,12 +62,43 @@ class CommandAttributes:
         return self.details
 
 
+@dataclass
+class CommandFunctionBindings:
+    __BINDINGS_ATTR__: ClassVar[str] = "__cmd__"
+
+    commands: list[ReferenceType[Command]] = field(
+        default_factory=list[ReferenceType["Command"]]
+    )
+    hooks: list[Callable[[Command], None]] = field(
+        default_factory=list[Callable[["Command"], None]]
+    )
+
+    def updated(self) -> Self:
+        for collected in (cmd for cmd in self.commands if cmd() is None):
+            self.commands.remove(collected)
+        return self
+
+    @staticmethod
+    def get(function: Callable[..., Any]) -> CommandFunctionBindings | None:
+        if not hasattr(function, CommandFunctionBindings.__BINDINGS_ATTR__):
+            object.__setattr__(
+                function,
+                CommandFunctionBindings.__BINDINGS_ATTR__,
+                CommandFunctionBindings(),
+            )
+            if not hasattr(function, CommandFunctionBindings.__BINDINGS_ATTR__):
+                return None
+
+        bindings = getattr(function, CommandFunctionBindings.__BINDINGS_ATTR__)
+        assert isinstance(bindings, CommandFunctionBindings)
+        return bindings.updated()
+
+
 @dataclass(frozen=True)
 class Command:
-    __mutable_attributes__: ClassVar[WeakKeyDictionary[Command, CommandAttributes]] = WeakKeyDictionary()
-
-    __CMD_ATTR__ = "__cmd__"
-    __CMD_HOOKS_ATTR__ = "__cmd_hooks__"
+    __mutable_attributes__: ClassVar[WeakKeyDictionary[Command, CommandAttributes]] = (
+        WeakKeyDictionary()
+    )
 
     function: Callable[..., Any]
     parameters: tuple[CommandParameter, ...]
@@ -70,7 +114,7 @@ class Command:
         help: str | None = None,
         kwarg_prefix: str | None = None,
         parameter_extractor: ParameterExtractor = default_parameter_extractor,
-        help_extractor: HelpExtractor = default_help_extractor
+        help_extractor: HelpExtractor = default_help_extractor,
     ) -> Command:
         """
         Create a Command, wrapper for using either `name` or `names`
@@ -94,7 +138,7 @@ class Command:
             parameters=parameters,
             names=names,
             help=help_extractor(help, function, parameters),
-            kwarg_prefix=kwarg_prefix or "--"
+            kwarg_prefix=kwarg_prefix or "--",
         )
 
     @property
@@ -191,22 +235,18 @@ class Command:
                     raise ValueError(
                         f"Name for {self.function} cannot contain whitespace: {name}"
                     )
-        if getattr(self.function, Command.__CMD_ATTR__, None) is not None:
-            raise TypeError(f"Function {self.function} is already a {Command}.")
         if self.help is not None and not isinstance(self.help, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError(f"{Command} help must be a {str}.")
 
     def _attach_self(self) -> None:
-        assert not hasattr(self.function, Command.__CMD_ATTR__)
-        try:
-            setattr(self.function, Command.__CMD_ATTR__, self)
-        except AttributeError:
-            pass
+        if (binding := CommandFunctionBindings.get(self.function)) is None:
+            return
+        binding.commands.append(ref(self))
 
     def _callback_futures(self) -> None:
-        if not hasattr(self.function, Command.__CMD_HOOKS_ATTR__):
+        if (binding := CommandFunctionBindings.get(self.function)) is None:
             return
-        for callback in getattr(self.function, Command.__CMD_HOOKS_ATTR__):
+        for callback in binding.hooks:
             callback(self)
 
     def __post_init__(self) -> None:
@@ -270,23 +310,38 @@ class Command:
 
 
 def is_cmd(function: Callable[..., Any]) -> bool:
-    return hasattr(function, Command.__CMD_ATTR__)
+    if (binding := CommandFunctionBindings.get(function)) is None:
+        return False
+    return len(binding.commands) > 0
 
 
 def cmd(function: Callable[..., Any]) -> Command:
-    if is_cmd(function):
-        return getattr(function, Command.__CMD_ATTR__)
-    raise ValueError(f"{function} is not a command. Use {is_cmd}.")
+    if (
+        binding := CommandFunctionBindings.get(function)
+    ) is None or not binding.commands:
+        raise ValueError(f"{function} is not a command. Use {is_cmd}.")
+    command = binding.commands[-1]()
+    assert command is not None, (
+        "CommandFunctionBindings.get(...) should ensure all references are valid"
+    )
+    return command
 
 
-def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) -> None:
+def cmds(function: Callable[..., Any]) -> list[Command]:
+    if (binding := CommandFunctionBindings.get(function)) is None:
+        return []
+    return [cmd for reference in binding.commands if (cmd := reference()) is not None]
+
+
+def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) -> bool:
     if is_cmd(function):
         raise TypeError(
             f"function {function} is already not a future command, it is already a command: {cmd(function)}"
         )
-    if not hasattr(function, Command.__CMD_HOOKS_ATTR__):
-        setattr(function, Command.__CMD_HOOKS_ATTR__, [])
-    getattr(function, Command.__CMD_HOOKS_ATTR__).append(callback)
+    if (binding := CommandFunctionBindings.get(function)) is None:
+        return False
+    binding.hooks.append(callback)
+    return True
 
 
 __all__ = ["Command", "cmd", "cmd_hook", "is_cmd"]

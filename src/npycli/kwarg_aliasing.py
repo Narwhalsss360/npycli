@@ -62,7 +62,7 @@ def alias_cmd_kwargs(
                 assert parameter is not None, (
                     f"{kwarg} is not a parameter, cannot alias."
                 )
-                parameter.names = parameter.names + kwarg_aliases
+                parameter.add_custom_attribute("Internal aliases:", kwarg_aliases)
 
         cmd_hook(func, add_detail)
         attach_kwarg_aliases(func, aliases)
