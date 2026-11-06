@@ -7,8 +7,8 @@ from typing import Any, Self
 from .command import Command
 from .errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
 from .middleware import (
+    CommandExecutionInfoMiddlewareHandler,
     CommandExecutionInfoMiddlewareResult,
-    CommandForMiddlewareHandler,
     CommandForMiddlewareHandlerInfo,
     ErrorMiddlewareHandler,
     ErrorMiddlewareHandlerInfo,
@@ -53,6 +53,99 @@ class CLI:
     RAISE: RaiseExpectionSentinelType = RaiseExpectionSentinelType()
 
     class MiddlewareManager:
+        class Register:
+            def __init__(self, middleware_manager: CLI.MiddlewareManager) -> None:
+                self._middlware_manager: CLI.MiddlewareManager = middleware_manager
+
+            def prompt(
+                self,
+            ) -> Callable[[PromptMiddlewareHandler], PromptMiddlewareHandler]:
+                def decorator(
+                    prompter: PromptMiddlewareHandler,
+                ) -> PromptMiddlewareHandler:
+                    self._middlware_manager.set_prompt_middleware(prompter)
+                    return prompter
+
+                return decorator
+
+            def split(
+                self,
+            ) -> Callable[[SplitMiddlewareHandler], SplitMiddlewareHandler]:
+                def decorator(
+                    splitter: SplitMiddlewareHandler,
+                ) -> SplitMiddlewareHandler:
+                    self._middlware_manager.set_split_middleware(splitter)
+                    return splitter
+
+                return decorator
+
+            def command_execution_info(
+                self, wrapping: bool = True
+            ) -> Callable[
+                [CommandExecutionInfoMiddlewareHandler],
+                CommandExecutionInfoMiddlewareHandler,
+            ]:
+                def decorator(
+                    command_execution_info: CommandExecutionInfoMiddlewareHandler,
+                ) -> CommandExecutionInfoMiddlewareHandler:
+                    if wrapping:
+                        self._middlware_manager.wrap_command_execution_info_middleware(
+                            command_execution_info
+                        )
+                    else:
+                        self._middlware_manager.set_command_execution_info_middleware(
+                            command_execution_info
+                        )
+                    return command_execution_info
+
+                return decorator
+
+            def executor(
+                self, wrapping: bool = True
+            ) -> Callable[[ExecutorMiddlewareHandler], ExecutorMiddlewareHandler]:
+                def decorator(
+                    executor: ExecutorMiddlewareHandler,
+                ) -> ExecutorMiddlewareHandler:
+                    if wrapping:
+                        self._middlware_manager.wrap_executor_middleware(executor)
+                    else:
+                        self._middlware_manager.set_executor_middleware(executor)
+                    return executor
+
+                return decorator
+
+            def error(
+                self, wrapping: bool = True
+            ) -> Callable[[ErrorMiddlewareHandler], ErrorMiddlewareHandler]:
+                def decorator(
+                    error_handler: ErrorMiddlewareHandler,
+                ) -> ErrorMiddlewareHandler:
+                    if wrapping:
+                        self._middlware_manager.wrap_error_middleware(error_handler)
+                    else:
+                        self._middlware_manager.set_error_middleware(error_handler)
+                    return error_handler
+
+                return decorator
+
+            def return_value(
+                self, wrapping: bool = True
+            ) -> Callable[[ReturnValueMiddlewareHandler], ReturnValueMiddlewareHandler]:
+                def decorator(
+                    return_value: ReturnValueMiddlewareHandler,
+                ) -> ReturnValueMiddlewareHandler:
+                    if wrapping:
+                        self._middlware_manager.wrap_return_value_middleware(
+                            return_value
+                        )
+                    else:
+                        self._middlware_manager.set_return_value_middleware(
+                            return_value
+                        )
+                    return return_value
+
+                return decorator
+
         def __init__(self, cli: CLI) -> None:
             self._cli: CLI = cli
             self._prompt_middleware_handler_info: PromptMiddlewareHandlerInfo = (
@@ -89,6 +182,10 @@ class CLI:
         def cli(self) -> CLI:
             return self._cli
 
+        @property
+        def register(self) -> CLI.MiddlewareManager.Register:
+            return CLI.MiddlewareManager.Register(self)
+
         @staticmethod
         def default_prompter(_: MiddlewareContext, prompt: str) -> str:
             return input(prompt)
@@ -124,7 +221,7 @@ class CLI:
             )
 
         def set_command_execution_info_middleware(
-            self, command_execution_info: CommandForMiddlewareHandler
+            self, command_execution_info: CommandExecutionInfoMiddlewareHandler
         ) -> Self:
             self._command_execution_info_handler_handler_info.handler = (
                 command_execution_info
@@ -132,7 +229,7 @@ class CLI:
             return self
 
         def wrap_command_execution_info_middleware(
-            self, command_execution_info: CommandForMiddlewareHandler
+            self, command_execution_info: CommandExecutionInfoMiddlewareHandler
         ) -> Self:
             if (
                 self._command_execution_info_handler_handler_info.handler
@@ -494,7 +591,7 @@ class CLI:
 
         try:
             command, return_value = self._middleware_manager.executor(
-                command, entries[1:], self.parsers
+                command, command_execution_info.arg_entries, self.parsers
             )
             return_value = self._middleware_manager.return_value(command, return_value)
         except CLIError as cli_error:

@@ -59,7 +59,7 @@ class CommandAttributes:
 
     @property
     def details(self) -> list[str]:
-        return self.details
+        return self._details
 
 
 @dataclass

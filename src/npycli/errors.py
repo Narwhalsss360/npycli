@@ -49,6 +49,13 @@ class CommandArgumentError(CLIError):
         super().__init__(*args, **kwargs)
 
 
+class MiddlewareError(CLIError):
+    def __init__(
+        self, *args: Any, cli: CLI | None = None, command: Command | None = None
+    ) -> None:
+        super().__init__(*args, cli=cli, command=command)
+
+
 def causes(exception: BaseException, include_self: bool) -> Iterator[BaseException]:
     exc: BaseException | None = exception if include_self else exception.__cause__
     while exc is not None:

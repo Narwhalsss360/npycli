@@ -64,7 +64,7 @@ type PromptMiddlewareHandler = MiddlewareHandler[[str], str]
 
 type SplitMiddlewareHandler = MiddlewareHandler[[str], Sequence[str]]
 
-type CommandForMiddlewareHandler = MiddlewareHandler[
+type CommandExecutionInfoMiddlewareHandler = MiddlewareHandler[
     [Sequence[str]], CommandExecutionInfoMiddlewareResult
 ]
 
