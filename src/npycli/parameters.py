@@ -344,7 +344,7 @@ def container_annotation_item_types(
 
 class CommandParameterBuilder:
     DEFAULT_STR: str = ""
-    DEFAULT_NAMES: ClassVar[list[str]] = [""]
+    DEFAULT_NAMES: ClassVar[list[str]] = []
     DEFAULT_ARG_TYPES: ClassVar[list[CommandParameterType]] = [str]
 
     def __init__(
@@ -400,6 +400,9 @@ class CommandParameterBuilder:
 
     def _next_metadata_annotation(self, annotation: Any) -> None:
         if isinstance(annotation, Alias):
+            if self._parameter_names is CommandParameterBuilder.DEFAULT_NAMES:
+                self._parameter_names = []
+
             if not annotation.private:
                 self._parameter_names.insert(0, self._name)
             self._parameter_names.extend(annotation.aliases)
@@ -568,6 +571,7 @@ class CommandParameterBuilder:
             else self._parameter_description,
             parse_hooks=self._parameter_parse_hooks,
             container_annotation=self._parameter_container_annotation,
+            item_types=tuple(self._parameter_item_types)if self._parameter_item_types else (),
             _private_name=self._private_name,
         )
         for key, value in self._custom_attributes.items():
