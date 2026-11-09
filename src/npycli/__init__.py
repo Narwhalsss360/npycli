@@ -1,4 +1,4 @@
-from . import ansi, cli, command, errors, kwarg_aliasing, parameters, parsing
+from . import abc, ansi, cli, command, errors, kwarg_aliasing, parameters, parsing
 from . import ansi as ecma48
 from .cli import CLI
 from .command import Command
@@ -40,6 +40,7 @@ __all__ = [
     "ParseHooks",
     "ParsingError",
     "TooManyArgumentsError",
+    "abc",
     "ansi",
     "cli",
     "command",

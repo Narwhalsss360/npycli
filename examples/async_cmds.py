@@ -1,10 +1,11 @@
 import asyncio
-import inspect
-import shlex
 from types import FunctionType
-from typing import Any, cast
+from typing import Any
 
-from npycli import CLI, CLIError, Command, EmptyEntriesError
+import npycli
+from npycli import CLIError, EmptyEntriesError
+from npycli.asyncio.cli import CLI
+from npycli.parameters import CommandParameter
 
 cli = CLI("async program")
 
@@ -15,9 +16,57 @@ async def do_async_operation(sleeptime: float | None = None) -> None:
     print("Done!")
 
 
-@cli.cmd("help")
-def help_cmd() -> str:
-    return "\n\n".join([cmd.extended_command_help() for cmd in cli.commands])
+@cli.cmd(
+    name="help",
+    help=(
+        "<...>: Positional or Keyword\n"
+        "<*...>: Variable Positional\n"
+        "<**...>: Variable Keyword\n"
+        "/: Positional / Keyword Only Delimiter\n"
+        "<: ...>: Type\n"
+        "<: = ...>: Default Value\n"
+        "[...]: Boolean Flag (Keyword only, no value needed)\n"
+    ),
+)
+def help_cmd(
+    command_name: str | None = None,
+    parameter_name: str | None = None,
+    /,
+    *,
+    extended: bool = False,
+) -> str:
+    if extended:
+        command_help, parameter_help = (
+            npycli.abc.command.Command.extended_command_help,
+            CommandParameter.extended_parameter_help,
+        )
+    else:
+        command_help, parameter_help = (
+            npycli.abc.command.Command.basic_command_help,
+            CommandParameter.basic_parameter_help,
+        )
+
+    if command_name is None:
+        out: str = ""
+        for i, command in enumerate(cli.commands):
+            out += f"{command_help(command)}"
+            if i != len(cli.commands) - 1:
+                out += "\n"
+        return out
+
+    if (command := cli.get_command(command_name)) is None:
+        return f"{command_name} is not a command."
+
+    if parameter_name is not None:
+        if (
+            parameter := next(
+                filter(lambda p: parameter_name in p.names, command.parameters), None
+            )
+        ) is None:
+            return f"'{parameter_name}' is not a parameter"
+        return parameter_help(parameter)
+
+    return command_help(command)
 
 
 async def cleanup():
@@ -33,44 +82,27 @@ async def quit() -> FunctionType:
 
 
 @cli.retvals()
-def retvals(command: Command, return_value: Any | None) -> Any | None:
-    print(f"{command} -> {return_value}")
-    return command, return_value
+async def retvals(command: npycli.abc.Command, return_value: Any | None) -> Any | None:
+    print(f"{command} ->\n{return_value}")
+    return return_value
 
 
 async def main() -> None:
+    await cli
     while True:
         try:
-            # Asynchronously wait for input in another thread to not block this event loop
-            try:
-                user_input: str = await asyncio.to_thread(
-                    input, cli.prompt_entry_marker
-                )
-            except KeyboardInterrupt:
+            return_value: Any = await cli.prompt()
+            if return_value is quit:
                 break
-
-            # retvals handler ensure the return value is this tuple
-            command, retval = cli.exec(shlex.split(user_input))
-            assert isinstance(command, Command)
-
-            # If the invoked command was a coroutine, await the coroutine and reprocess it in retvals handler
-            if inspect.iscoroutine(retval):
-                retval = retvals(command, await retval)
-                assert isinstance(retval, tuple)
-                assert len(retval) == 2  # pyright: ignore[reportUnknownArgumentType]
-                retval = cast(Any | None, retval[1])
-
-            if retval == quit:
-                return
+        except KeyboardInterrupt:
+            break
         except asyncio.CancelledError as cancellation:
             if cancellation.__cause__ or cancellation.__context__:
                 raise
             break
-        except EmptyEntriesError:  # If the user entered nothing, just continue
-            pass
-        except (
-            CLIError
-        ) as err:  # Catch errors that occur between here and execution of command
+        except EmptyEntriesError:
+            continue
+        except CLIError as err:
             print(f"{err.__class__.__name__}: {err.args[0]}")
 
 
@@ -78,4 +110,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        ...
+        pass

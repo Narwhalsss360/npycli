@@ -2,7 +2,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
-from .command import Command, cmd_hook
+from .abc.command import Command, cmd_hook
 
 ALIASES_ATTR = "__kwarg_aliases__"
 

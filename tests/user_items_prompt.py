@@ -1,5 +1,6 @@
 
-from npycli import CLI, Command, CommandDoesNotExistError, EmptyEntriesError
+from npycli import CLI, ABCCommandType, CommandDoesNotExistError, EmptyEntriesError
+from npycli.command import require_sync_cmd
 from npycli.kwarg_aliasing import alias_cmd_kwargs
 
 cli = CLI(title="user-items", prompt_marker="->", env={"user-items": {}})
@@ -62,13 +63,17 @@ def show_help() -> str:
 
 
 @cli.retvals()
-def retvals(command: Command, retval: str) -> None:
+def retvals(command: ABCCommandType, retval: str) -> None:
+    require_sync_cmd(command)
     __log_out__(f"{command.name}:\n{retval}\n")
     print(retval)
 
 
 @cli.errors()
-def errors(command: Command | None, exception: Exception) -> None:
+def errors(command: ABCCommandType | None, exception: Exception) -> None:
+    if command is not None:
+        require_sync_cmd(command)
+
     print(
         f"Exception {exception.__class__.__name__} thrown: {exception} | {exception.args} - {f' Running command {command.name}' if command is not None else ''}"
     )

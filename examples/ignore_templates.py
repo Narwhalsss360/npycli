@@ -9,13 +9,13 @@ except ImportError:
     print("Module aiohttp is required for this example", file=stderr)
     exit(1)
 
-from npycli import Command, command
 from npycli.ansi.const.sgr import (
     BOLD_OR_INCREASED_INTENSITY,
     DEFAULT_RENDITION,
     RED_DISPLAY,
 )
 from npycli.ansi.sequences import SGR
+from npycli.asyncio import Command, command
 from npycli.errors import CommandArgumentError
 from npycli.parameters import AnnotationPreview
 
@@ -46,10 +46,10 @@ async def fetch_string(session: ClientSession, url: str) -> str:
         return await response.text()
 
 
-async def main(
+async def ignore_templates(
     *templates: Annotated[str, AnnotationPreview("'*.gitignore'")],
 ) -> None:
-    this_cmd: Command = command.cmd(main)
+    this_cmd: Command = command.require_async_cmd(command.cmd(ignore_templates))
     for template_name in templates:
         if not template_name.endswith(".gitignore"):
             raise CommandArgumentError(
@@ -71,16 +71,24 @@ async def main(
     )
 
 
-cmd: Command = Command.create(main, Path(__file__).name.replace(".py", ""))
-if __name__ == "__main__":
+async def main() -> int:
+    cmd: Command = await Command.create(
+        ignore_templates, Path(__file__).name.replace(".py", "")
+    )
     if len(argv) == 1:
         print(cmd)
-        exit(1)
+        return 1
 
     try:
-        run(cmd(argv[1:]))
+        await cmd(argv[1:])
     except (CommandArgumentError, ClientError) as e:
         print_error(e)
-        exit(1)
+        return 1
     except (KeyboardInterrupt, CancelledError):
         print("\n^C")
+
+    return 0
+
+
+if __name__ == "__main__":
+    exit(run(main()))

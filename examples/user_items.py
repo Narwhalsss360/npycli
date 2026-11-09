@@ -4,7 +4,8 @@ from os.path import isfile
 from types import FrameType
 from typing import IO, Any
 
-from npycli import CLI, CLIError, Command, EmptyEntriesError
+from npycli import CLI, CLIError, EmptyEntriesError
+from npycli.abc import command as abccommand
 from npycli.command import cmd
 from npycli.errors import causes
 from npycli.kwarg_aliasing import alias_cmd_kwargs
@@ -114,12 +115,12 @@ def help_cmd(
 ) -> str:
     if extended:
         command_help, parameter_help = (
-            Command.extended_command_help,
+            abccommand.Command.extended_command_help,
             CommandParameter.extended_parameter_help,
         )
     else:
         command_help, parameter_help = (
-            Command.basic_command_help,
+            abccommand.Command.basic_command_help,
             CommandParameter.basic_parameter_help,
         )
 
@@ -148,14 +149,14 @@ def help_cmd(
 
 
 @cli.retvals()
-def retvals(command: Command, return_value: Any | None) -> Any | None:
+def retvals(command: abccommand.Command, return_value: Any | None) -> Any | None:
     if return_value is None:
         return
     print(f"{command.name}:\n{return_value}")
 
 
 @cli.errors()
-def errors(command: Command, exc: Exception) -> Any | None:
+def errors(command: abccommand.Command, exc: Exception) -> Any | None:
     errors_string: str = "\n".join(
         [f"{' ' * TAB_WIDTH}{e.__class__.__name__}: {e}" for e in causes(exc, True)]
     )

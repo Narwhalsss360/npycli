@@ -12,4 +12,4 @@ def main(*nums: int) -> None:
 
 
 if __name__ == "__main__":
-    Command.create(function=main, name="main")(argv[1:])
+    Command.create(function=main, name="main")(("1", "2", *argv[1:]))

@@ -4,8 +4,8 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .cli import CLI
-    from .command import Command
+    from .abc.cli import CLI
+    from .abc.command import Command
 
 
 class ParsingError(Exception):
@@ -68,6 +68,7 @@ __all__ = [
     "CommandArgumentError",
     "CommandDoesNotExistError",
     "EmptyEntriesError",
+    "MiddlewareError",
     "MissingKeywordArgumentValueError",
     "ParsingError",
     "TooManyArgumentsError",

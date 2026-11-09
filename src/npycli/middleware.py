@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from asyncio import to_thread
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Protocol
+from inspect import iscoroutinefunction
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Protocol, TypeGuard, cast
 
-from .command import Command
 from .parameters import Parsers
 
 if TYPE_CHECKING:
-    from .cli import CLI
+    from .abc.cli import CLI
+    from .abc.command import Command
 
 
 @dataclass(frozen=True)
@@ -60,52 +62,92 @@ class HandlerInfo[**P, R]:
     context: MiddlewareContext
 
 
-type PromptMiddlewareHandler = MiddlewareHandler[[str], str]
+type OptionallyAwaitable[T] = T | Awaitable[T]
 
-type SplitMiddlewareHandler = MiddlewareHandler[[str], Sequence[str]]
+type PromptMiddlewareHandler = MiddlewareHandler[[str], OptionallyAwaitable[str]]
+
+type SplitMiddlewareHandler = MiddlewareHandler[
+    [str], OptionallyAwaitable[Sequence[str]]
+]
 
 type CommandExecutionInfoMiddlewareHandler = MiddlewareHandler[
-    [Sequence[str]], CommandExecutionInfoMiddlewareResult
+    [Sequence[str]], OptionallyAwaitable[CommandExecutionInfoMiddlewareResult]
 ]
 
 type ExecutorMiddlewareHandler = MiddlewareHandler[
-    [Command, Sequence[str], Parsers], ExecutorMiddlewareResult
+    [Command, Sequence[str], Parsers], OptionallyAwaitable[ExecutorMiddlewareResult]
 ]
 
-type ErrorMiddlewareHandler = MiddlewareHandler[[Command, Exception], Any]
+type ErrorMiddlewareHandler = MiddlewareHandler[
+    [Command, Exception], OptionallyAwaitable[Any]
+]
 
-type ReturnValueMiddlewareHandler = MiddlewareHandler[[Command, Any], Any]
+type ReturnValueMiddlewareHandler = MiddlewareHandler[
+    [Command, Any], OptionallyAwaitable[Any]
+]
+
+
+async def wrap_sync[**P, T](
+    function: Callable[P, OptionallyAwaitable[T]], *args: P.args, **kwargs: P.kwargs
+) -> T:
+    if iscoroutinefunction(function):
+        return await function(*args, **kwargs)
+    return cast(T, await to_thread(function, *args, **kwargs))
+
+
+def is_sync_function[**P, T](
+    function: Callable[P, OptionallyAwaitable[T]],
+) -> TypeGuard[Callable[P, T]]:
+    return not iscoroutinefunction(function)
+
+
+def sync[**P, T](
+    function: Callable[P, OptionallyAwaitable[T]], *args: P.args, **kwargs: P.kwargs
+) -> T:
+    assert is_sync_function(function)
+    return function(*args, **kwargs)
 
 
 @dataclass
-class PromptMiddlewareHandlerInfo(HandlerInfo[[str], str]):
+class PromptMiddlewareHandlerInfo(HandlerInfo[[str], OptionallyAwaitable[str]]):
     pass
 
 
 @dataclass
-class SplitMiddlewareHandlerInfo(HandlerInfo[[str], Sequence[str]]):
+class SplitMiddlewareHandlerInfo(
+    HandlerInfo[[str], OptionallyAwaitable[Sequence[str]]]
+):
     pass
 
 
 @dataclass
 class CommandForMiddlewareHandlerInfo(
-    HandlerInfo[[Sequence[str]], CommandExecutionInfoMiddlewareResult]
+    HandlerInfo[
+        [Sequence[str]], OptionallyAwaitable[CommandExecutionInfoMiddlewareResult]
+    ]
 ):
     pass
 
 
 @dataclass
 class ExecutorMiddlewareHandlerInfo(
-    HandlerInfo[[Command, Sequence[str], Parsers], ExecutorMiddlewareResult]
+    HandlerInfo[
+        ["Command", Sequence[str], Parsers],
+        OptionallyAwaitable[ExecutorMiddlewareResult],
+    ]
 ):
     pass
 
 
 @dataclass
-class ErrorMiddlewareHandlerInfo(HandlerInfo[[Command, Exception], Any]):
+class ErrorMiddlewareHandlerInfo(
+    HandlerInfo[["Command", Exception], OptionallyAwaitable[Any]]
+):
     pass
 
 
 @dataclass
-class ReturnValueMiddlewareHandlerInfo(HandlerInfo[[Command, Any], Any]):
+class ReturnValueMiddlewareHandlerInfo(
+    HandlerInfo[["Command", Any], OptionallyAwaitable[Any]]
+):
     pass
