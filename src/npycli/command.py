@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Self, TypeGuard, override
 
-from npycli.parameters import CommandParameter, Parsers
+from npycli.parameters import CommandParameter, CommandParameterParser, Parsers
 
 from .abc import command as abccommand
 from .abc.command import (
@@ -19,7 +19,7 @@ from .abc.command import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class Command(abccommand.Command):
     @classmethod
     @override
@@ -29,9 +29,9 @@ class Command(abccommand.Command):
         name: str | None = None,
         names: tuple[str, ...] | None = None,
         help: str | None = None,
-        kwarg_prefix: str | None = None,
         parameter_extractor: abccommand.ParameterExtractor = abccommand.default_parameter_extractor,
         help_extractor: abccommand.HelpExtractor = abccommand.default_help_extractor,
+        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
     ) -> Self:
         if names is None:
             if name:
@@ -45,8 +45,7 @@ class Command(abccommand.Command):
             parameters=parameters,
             names=names,
             help=help_extractor(help, function, parameters),
-            kwarg_prefix=kwarg_prefix or "--",
-        )
+        ).with_kwarg_prefix(kwarg_prefix)
 
     @property
     @override
@@ -54,18 +53,20 @@ class Command(abccommand.Command):
         return False
 
     def __post_init__(self) -> None:
-        super().__post_init__()
+        super(Command, self).__post_init__()
         self._sync_callback_futures()
 
     def exec_with(
         self,
         entries: Sequence[str],
-        parsers: Parsers | None = None,
+        parsers: Parsers | CommandParameterParser | None = None,
     ) -> Any:
         return self.sync_exec_with(entries, parsers)
 
     def __call__(
-        self, args: Sequence[str] | None = None, parsers: Parsers | None = None
+        self,
+        args: Sequence[str] | None = None,
+        parsers: Parsers | CommandParameterParser | None = None,
     ) -> Any:
         return self.sync_exec_with(args or (), parsers)
 

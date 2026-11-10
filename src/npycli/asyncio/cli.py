@@ -27,8 +27,7 @@ class CLI(abccli.CLI):
                     function=function,
                     name=name,
                     names=names,
-                    help=help,
-                    kwarg_prefix=self.kwarg_prefix,
+                    help=help
                 )
             )
             return function

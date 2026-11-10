@@ -26,6 +26,7 @@ async def do_async_operation(sleeptime: float | None = None) -> None:
         "<: ...>: Type\n"
         "<: = ...>: Default Value\n"
         "[...]: Boolean Flag (Keyword only, no value needed)\n"
+        f"Keyword prefix: '{cli.kwarg_prefix}'"
     ),
 )
 def help_cmd(

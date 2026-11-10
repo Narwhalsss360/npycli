@@ -1,7 +1,8 @@
 from types import NoneType
 from typing import Annotated
 
-from npycli import CLI, Command, CommandDoesNotExistError, EmptyEntriesError
+import npycli
+from npycli import CLI, CommandDoesNotExistError, EmptyEntriesError
 from npycli.kwarg_aliasing import alias_cmd_kwargs
 from npycli.parameters import CommandParameter, Description
 
@@ -141,13 +142,13 @@ def show_help(
 
 
 @cli.retvals()
-def retvals(command: Command, retval: str) -> None:
+def retvals(command: npycli.abc.Command, retval: str) -> None:
     __log_out__(f"{command.name}:\n{retval}\n")
     print(retval)
 
 
 @cli.errors()
-def errors(command: Command | None, exception: Exception) -> None:
+def errors(command: npycli.abc.Command | None, exception: Exception) -> None:
     print(
         f"Exception {exception.__class__.__name__} thrown: {exception} | {exception.args} - {f' Running command {command.name}' if command is not None else ''}"
     )

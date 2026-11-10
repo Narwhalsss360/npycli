@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from asyncio import gather, to_thread
+from asyncio import gather
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from inspect import getdoc, iscoroutinefunction, signature
+from inspect import getdoc, signature
 from typing import Any, ClassVar, Self, get_type_hints
 from weakref import ReferenceType, WeakKeyDictionary, ref
 
@@ -12,9 +12,9 @@ from npycli.errors import CommandArgumentError, ParsingError
 from npycli.middleware import wrap_sync
 from npycli.parameters import (
     CommandParameter,
+    CommandParameterParser,
     ParameterKind,
     Parsers,
-    parse_parameters,
 )
 
 type ParameterExtractor = Callable[[Callable[..., Any]], tuple[CommandParameter, ...]]
@@ -53,13 +53,24 @@ def default_help_extractor(
 
 
 class CommandAttributes:
+    __slots__ = ("_details", "_has_invoked_callbacks", "_kwarg_prefix")
+
     def __init__(self) -> None:
         self._details: list[str] = []
         self._has_invoked_callbacks: bool = False
+        self._kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX
 
     def add_detail(self, detail: str) -> Self:
         self._details.append(detail)
         return self
+
+    @property
+    def kwarg_prefix(self) -> str:
+        return self._kwarg_prefix
+
+    @kwarg_prefix.setter
+    def kwarg_prefix(self, value: str) -> None:
+        self._kwarg_prefix = value
 
     @property
     def details(self) -> list[str]:
@@ -76,7 +87,7 @@ class CommandAttributes:
         self._has_invoked_callbacks = value
 
 
-@dataclass
+@dataclass(slots=True)
 class CommandFunctionBindings:
     __BINDINGS_ATTR__: ClassVar[str] = "__cmd__"
 
@@ -108,7 +119,7 @@ class CommandFunctionBindings:
         return bindings.updated()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class Command(ABC):
     __mutable_attributes__: ClassVar[WeakKeyDictionary[Command, CommandAttributes]] = (
         WeakKeyDictionary()
@@ -118,7 +129,6 @@ class Command(ABC):
     parameters: tuple[CommandParameter, ...]
     names: tuple[str, ...]
     help: str | None = field(default=None)
-    kwarg_prefix: str = field(default_factory=lambda: "--")
 
     @classmethod
     @abstractmethod
@@ -128,9 +138,9 @@ class Command(ABC):
         name: str | None = None,
         names: tuple[str, ...] | None = None,
         help: str | None = None,
-        kwarg_prefix: str | None = None,
         parameter_extractor: ParameterExtractor = default_parameter_extractor,
         help_extractor: HelpExtractor = default_help_extractor,
+        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
     ) -> Self:
         pass
 
@@ -173,6 +183,14 @@ class Command(ABC):
     def has_invoked_callbacks(self) -> bool:
         return Command.__mutable_attributes__[self].has_invoked_callbacks
 
+    @property
+    def kwarg_prefix(self) -> str:
+        return Command.__mutable_attributes__[self].kwarg_prefix
+
+    def with_kwarg_prefix(self, kwarg_prefix: str) -> Self:
+        Command.__mutable_attributes__[self].kwarg_prefix = kwarg_prefix
+        return self
+
     def add_detail(self, detail: str) -> Self:
         """
         Add details to this `Command`
@@ -189,7 +207,7 @@ class Command(ABC):
     def sync_exec_with(
         self,
         entries: Sequence[str],
-        parsers: Parsers | None = None,
+        parsers: Parsers | CommandParameterParser | None = None,
     ) -> Any:
         """
         Execute this `Command` with specified arguments and parsers
@@ -198,14 +216,19 @@ class Command(ABC):
         :return:
         """
 
-        try:
-            args, kwargs = parse_parameters(
-                self.parameters,
-                entries,
-                self.kwarg_prefix,
-                self.kwarg_prefix,
-                parsers or {},
+        parser: CommandParameterParser
+        if parsers is None:
+            parser = CommandParameterParser(self.kwarg_prefix, self.kwarg_prefix, {})
+        elif isinstance(parsers, CommandParameterParser):
+            parser = parsers
+        else:
+            parser = CommandParameterParser(
+                self.kwarg_prefix, self.kwarg_prefix, parsers
             )
+        self.with_kwarg_prefix(parser.keyword_prefix)
+
+        try:
+            args, kwargs = parser.parse(self.parameters, entries)
             return self.function(*args, **kwargs)
         except TypeError as type_error:
             if self._is_argument_error(type_error):
@@ -219,20 +242,22 @@ class Command(ABC):
             ) from parsing_error
 
     async def async_exec_with(
-        self, entries: Sequence[str], parsers: Parsers | None = None
+        self,
+        entries: Sequence[str],
+        parsers: Parsers | CommandParameterParser | None = None,
     ) -> Any:
-        try:
-            args, kwargs = parse_parameters(
-                self.parameters,
-                entries,
-                self.kwarg_prefix,
-                self.kwarg_prefix,
-                parsers or {},
+        parser: CommandParameterParser
+        if parsers is None:
+            parser = CommandParameterParser(self.kwarg_prefix, self.kwarg_prefix, {})
+        elif isinstance(parsers, CommandParameterParser):
+            parser = parsers
+        else:
+            parser = CommandParameterParser(
+                self.kwarg_prefix, self.kwarg_prefix, parsers
             )
-            if iscoroutinefunction(self.function):
-                return await self.function(*args, **kwargs)
-            else:
-                return await to_thread(self.function, *args, **kwargs)
+        try:
+            args, kwargs = parser.parse(self.parameters, entries)
+            return await wrap_sync(self.function, *args, **kwargs)
         except TypeError as type_error:
             if self._is_argument_error(type_error):
                 raise CommandArgumentError(

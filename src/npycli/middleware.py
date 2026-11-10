@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Protocol, TypeGuard, cast
 
-from .parameters import Parsers
+from .parameters import CommandParameterParser, Parsers
 
 if TYPE_CHECKING:
     from .abc.cli import CLI
@@ -75,7 +75,8 @@ type CommandExecutionInfoMiddlewareHandler = MiddlewareHandler[
 ]
 
 type ExecutorMiddlewareHandler = MiddlewareHandler[
-    [Command, Sequence[str], Parsers], OptionallyAwaitable[ExecutorMiddlewareResult]
+    [Command, Sequence[str], Parsers | CommandParameterParser],
+    OptionallyAwaitable[ExecutorMiddlewareResult],
 ]
 
 type ErrorMiddlewareHandler = MiddlewareHandler[
@@ -132,7 +133,7 @@ class CommandForMiddlewareHandlerInfo(
 @dataclass
 class ExecutorMiddlewareHandlerInfo(
     HandlerInfo[
-        ["Command", Sequence[str], Parsers],
+        ["Command", Sequence[str], Parsers | CommandParameterParser],
         OptionallyAwaitable[ExecutorMiddlewareResult],
     ]
 ):

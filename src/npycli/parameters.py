@@ -571,7 +571,9 @@ class CommandParameterBuilder:
             else self._parameter_description,
             parse_hooks=self._parameter_parse_hooks,
             container_annotation=self._parameter_container_annotation,
-            item_types=tuple(self._parameter_item_types)if self._parameter_item_types else (),
+            item_types=tuple(self._parameter_item_types)
+            if self._parameter_item_types
+            else (),
             _private_name=self._private_name,
         )
         for key, value in self._custom_attributes.items():
@@ -584,7 +586,7 @@ def default_pre_parse_hook(s: str) -> str:
     return s
 
 
-def default_post_parse_hook(s: str) -> str:
+def default_post_parse_hook(s: Any) -> Any:
     return s
 
 
@@ -647,7 +649,12 @@ def parse_with_hooks(
                 ):
                     if handled is parsing_error:
                         raise parsing_error from exc
-                    raise handled
+
+                    if handled is exc:
+                        raise
+                    else:
+                        raise handled
+
                 parsed = handled
                 break
 
@@ -681,6 +688,9 @@ def add_to_container_type(
 
 
 class CommandParameterParser:
+    DEFAULT_KEYWORD_PREFIX: ClassVar[str] = "--"
+    DEFAULT_ARGUMENT_SEPARATOR: ClassVar[str] = DEFAULT_KEYWORD_PREFIX
+
     class Context:
         def __init__(self, parameters: Sequence[CommandParameter]) -> None:
             self.arguments: list[Any] = []
@@ -701,13 +711,13 @@ class CommandParameterParser:
 
     def __init__(
         self,
-        keyword_prefix: str,
-        argument_separator: str,
-        parsers: Parsers,
+        keyword_prefix: str = DEFAULT_KEYWORD_PREFIX,
+        argument_separator: str = DEFAULT_ARGUMENT_SEPARATOR,
+        parsers: Parsers | None = None,
     ) -> None:
         self.keyword_prefix: str = keyword_prefix
         self.argument_separator: str = argument_separator
-        self.parsers: Parsers = parsers
+        self.parsers: Parsers = parsers or {}
 
     def _next_keyword(
         self,
@@ -919,7 +929,7 @@ class CommandParameterParser:
                     context.arguments[
                         len(parameters)
                         - (1 if len(context.arguments) == len(parameters) else 0)
-                    ],
+                    ] if context.arguments else entry,
                     "Too many positional arguments",
                 )
 

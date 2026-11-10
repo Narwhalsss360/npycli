@@ -26,7 +26,7 @@ from ..middleware import (
     sync,
     wrap_sync,
 )
-from ..parameters import Parsers
+from ..parameters import CommandParameterParser, Parsers
 from .command import Command
 
 type ReturnValueHandler = Callable[[Command, Any], Any]
@@ -402,7 +402,7 @@ class CLI(ABC):
             _: MiddlewareContext,
             command: Command,
             entries: Sequence[str],
-            parsers: Parsers,
+            parsers: Parsers | CommandParameterParser,
         ) -> ExecutorMiddlewareResult:
             return ExecutorMiddlewareResult(
                 command, command.sync_exec_with(entries, parsers)
@@ -413,7 +413,7 @@ class CLI(ABC):
             _: MiddlewareContext,
             command: Command,
             entries: Sequence[str],
-            parsers: Parsers,
+            parsers: Parsers | CommandParameterParser,
         ) -> ExecutorMiddlewareResult:
             return ExecutorMiddlewareResult(
                 command, await command.async_exec_with(entries, parsers)
@@ -436,7 +436,7 @@ class CLI(ABC):
                     context: MiddlewareContext,
                     command: Command,
                     entries: Sequence[str],
-                    parsers: Parsers,
+                    parsers: Parsers | CommandParameterParser,
                 ) -> ExecutorMiddlewareResult:
                     previous_result: ExecutorMiddlewareResult = await wrap_sync(
                         self._executor_middleware_handler_info.handler,
@@ -466,7 +466,7 @@ class CLI(ABC):
                     context: MiddlewareContext,
                     command: Command,
                     entries: Sequence[str],
-                    parsers: Parsers,
+                    parsers: Parsers | CommandParameterParser,
                 ) -> ExecutorMiddlewareResult:
                     previous_result: ExecutorMiddlewareResult = sync(
                         self._executor_middleware_handler_info.handler,
@@ -493,7 +493,10 @@ class CLI(ABC):
             return self
 
         def sync_executor(
-            self, command: Command, entries: Sequence[str], parsers: Parsers
+            self,
+            command: Command,
+            entries: Sequence[str],
+            parsers: Parsers | CommandParameterParser,
         ) -> ExecutorMiddlewareResult:
             return sync(
                 self._executor_middleware_handler_info.handler,
@@ -504,7 +507,10 @@ class CLI(ABC):
             )
 
         async def async_executor(
-            self, command: Command, entries: Sequence[str], parsers: Parsers
+            self,
+            command: Command,
+            entries: Sequence[str],
+            parsers: Parsers | CommandParameterParser,
         ) -> ExecutorMiddlewareResult:
             return await wrap_sync(
                 self._executor_middleware_handler_info.handler,
@@ -688,16 +694,28 @@ class CLI(ABC):
         self,
         title: str | None = None,
         prompt_marker: str | None = None,
-        kwarg_prefix: str | None = None,
+        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
         parsers: Parsers | None = None,
+        parser: CommandParameterParser | None = None,
         env: dict[Any, Any] | None = None,
         retval_handler: ReturnValueHandler | None = None,
         error_handler: ErrorHandler | None = None,
     ) -> None:
         self.title: str = title or "CLI"
         self.prompt_marker: str = prompt_marker or ">"
-        self.kwarg_prefix: str = kwarg_prefix or "--"
-        self.parsers: Parsers = parsers or {}
+
+        self._parser: CommandParameterParser
+        if parser is not None:
+            if any(x is not None for x in (kwarg_prefix, parsers)):
+                raise TypeError(
+                    "The arguments kwarg_prefix and parsers is both mutually exclusive with parser argument."
+                )
+            self._parser = parser
+        else:
+            self._parser: CommandParameterParser = CommandParameterParser(
+                kwarg_prefix, kwarg_prefix, parsers or {}
+            )
+
         self.env: dict[Any, Any] = env or {}
         self._commands: list[Command] = []
         self._middleware_manager: CLI.MiddlewareManager = CLI.MiddlewareManager(self)
@@ -705,6 +723,30 @@ class CLI(ABC):
             self.retvals()(retval_handler)
         if error_handler is not None:
             self.errors()(error_handler)
+
+    @property
+    def parser(self) -> CommandParameterParser:
+        return self._parser
+
+    @property
+    def parsers(self) -> Parsers:
+        return self._parser.parsers
+
+    @property
+    def kwarg_prefix(self) -> str:
+        return self._parser.keyword_prefix
+
+    @kwarg_prefix.setter
+    def kwarg_prefix(self, value: str) -> None:
+        self._parser.keyword_prefix = value
+
+    @property
+    def argument_separator(self) -> str:
+        return self._parser.argument_separator
+
+    @argument_separator.setter
+    def argument_separator(self, value: str) -> None:
+        self._parser.argument_separator = value
 
     @property
     @abstractmethod
@@ -854,7 +896,7 @@ class CLI(ABC):
 
         try:
             command, return_value = self._middleware_manager.sync_executor(
-                command, command_execution_info.arg_entries, self.parsers
+                command, command_execution_info.arg_entries, self._parser
             )
             return_value = self._middleware_manager.sync_return_value(
                 command, return_value
