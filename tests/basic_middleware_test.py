@@ -1,27 +1,45 @@
 import asyncio
-import inspect
+import time
 from collections.abc import Sequence
 from shlex import shlex
 from types import FunctionType
-from typing import Any, cast
+from typing import Any, Literal, cast
 
-from npycli import CLI, CLIError, Command, EmptyEntriesError
-from npycli.errors import MiddlewareError
+import npycli
+from npycli.asyncio import CLI
+from npycli.errors import CLIError, EmptyEntriesError, MiddlewareError, ParsingError
 from npycli.middleware import (
     CommandExecutionInfoMiddlewareHandler,
     CommandExecutionInfoMiddlewareResult,
-    ExecutorMiddlewareResult,
     MiddlewareContext,
 )
 from npycli.parameters import CommandParameter, ParameterKind
-from npycli.parsing import Parsers, parse_parameters
+from npycli.parsing import create_literal_parser, parse_parameters
 
 cli = CLI("async program")
 
 
+class UserError(CLIError):
+    pass
+
+
+type ErrorLevel = Literal["low", "high"]
+cli.parsers[ErrorLevel] = create_literal_parser(ErrorLevel)
+
+
 @cli.cmd("do-async-operation")
-async def do_async_operation(sleeptime: float | None = None) -> str:
+async def do_async_operation(
+    sleeptime: float | None = None, error_level: ErrorLevel = "low"
+) -> str:
     sleeptime = sleeptime if sleeptime is not None else 1
+    if sleeptime < 0:
+        args: tuple[Any, ...] = ("Parameter sleeptime must be positive",)
+        if error_level == "low":
+            raise UserError(*args)
+        else:
+            assert error_level == "high"
+            raise ValueError(*args)
+
     await asyncio.sleep(sleeptime)
     print("Done!")
     return f"Performed async opreation for {sleeptime} seconds"
@@ -48,12 +66,12 @@ def help_cmd(
 ) -> str:
     if extended:
         command_help, parameter_help = (
-            Command.extended_command_help,
+            npycli.abc.Command.extended_command_help,
             CommandParameter.extended_parameter_help,
         )
     else:
         command_help, parameter_help = (
-            Command.basic_command_help,
+            npycli.abc.Command.basic_command_help,
             CommandParameter.basic_parameter_help,
         )
 
@@ -92,70 +110,54 @@ async def quit() -> FunctionType:
     return quit
 
 
-@cli.middlewares.register.executor(wrapping=False)
-def async_task_executor(
-    context: MiddlewareContext,
-    command: Command,
-    entries: Sequence[str],
-    parsers: Parsers,
-) -> ExecutorMiddlewareResult:
-    if inspect.iscoroutinefunction(command.function):
-        coro: Any = command.exec_with(entries, parsers)
-        assert inspect.iscoroutine(coro)
-        return ExecutorMiddlewareResult(
-            command, asyncio.get_event_loop().create_task(coro)
-        )
-    else:
-        return ExecutorMiddlewareResult(
-            command,
-            asyncio.get_event_loop().create_task(
-                asyncio.to_thread(command.exec_with, entries, parsers)
-            ),
-        )
+@cli.middlewares.register.prompt()
+async def timed_async_prompter(context: MiddlewareContext, prompt: str) -> str:
+    """
+    Will simply time the amount of time elapsed from prompt to input.
+    """
 
-
-def async_task_executor_result(result: Any) -> asyncio.Task[Any]:
-    assert isinstance(result, asyncio.Task)
-    return cast(asyncio.Task[Any], result)
-
-
-@cli.retvals()
-def retvals(command: Command, retval: Any) -> Any:
-    if isinstance(retval, asyncio.Task):
-        retval = async_task_executor_result(retval)
-
-        async def awaited() -> Any:
-            return retvals(command, await retval)
-
-        return asyncio.get_event_loop().create_task(awaited())
-
-    print(f"{command.name} ->\n{retval}")
-    return retval
+    start_time: float = time.time()
+    result = await CLI.MiddlewareManager.async_default_prompter(context, prompt)
+    elapsed: float = time.time() - start_time
+    print(f"TIME WAITING FOR INPUT: {elapsed=}")
+    return result
 
 
 @cli.middlewares.register.split()
 def splitter(_: MiddlewareContext, user_input: str) -> Sequence[str]:
+    """
+    The lexical splitter for the CLI.
+    """
+
     lexer: shlex = shlex(user_input, posix=True)
-    lexer.wordchars += "&?|"
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    lexer.wordchars += "?&|"
     return list(lexer)
 
 
-def create_global_help_command_execution_info_middleare(
+def create_global_help_command_execution_info_middleware(
     global_help_flag_name: str = "help",
     help_command_name: str = "help",
     help_command_max_positionals: int = 2,
 ) -> CommandExecutionInfoMiddlewareHandler:
+    """
+    Curry function that creates a command execution info middleware handler for switch execution to the help command in case of a gloval help flag
+    """
+
     def global_help_command_execution_info(
         context: MiddlewareContext, entries: Sequence[str]
     ) -> CommandExecutionInfoMiddlewareResult:
         if isinstance(context.previous_result, CommandExecutionInfoMiddlewareResult):
-            command: Command | None = context.previous_result.command
+            command: npycli.abc.command.Command | None = context.previous_result.command
             arg_entries: Sequence[str] = context.previous_result.arg_entries
         else:
             if len(entries) == 0:
                 return CommandExecutionInfoMiddlewareResult(None, entries)
 
-            command: Command | None = context.cli.get_command(entries[0])
+            command: npycli.abc.command.Command | None = context.cli.get_command(
+                entries[0]
+            )
             arg_entries: Sequence[str] = entries[1:]
 
         if command is None:
@@ -252,40 +254,79 @@ def create_global_help_command_execution_info_middleare(
     return global_help_command_execution_info
 
 
+def format_cli_error(cli_error: CLIError) -> str:
+    return f"{type(cli_error).__name__}{f' of {cli.title}' if cli_error.cli is not None else ''}{f', executing command {cli_error.command.name}' if cli_error.command is not None else ''}: {'\n'.join(cli_error.args)}"
+
+
+def format_parsing_error(parsing_error: ParsingError) -> str:
+    return f"{type(parsing_error).__name__} of '{parsing_error.what}': {'\n'.join(parsing_error.args)}"
+
+
+@cli.middlewares.register.error(wrapping=False)
+def error_handler(
+    context: MiddlewareContext, command: npycli.abc.Command, error: Exception
+) -> Any:
+    """
+    Handles CLIErrors, if not all causes were ParsingErrors or CLIError, then just raise the exception up the frame stack.
+    In the case all all CLI/Parsing errors, return None back to the callsite
+    """
+
+    if isinstance(error, (asyncio.CancelledError, KeyboardInterrupt, MiddlewareError)):
+        return cli.RAISE
+
+    if not isinstance(error, CLIError):
+        return cli.RAISE
+
+    causes: tuple[BaseException, ...] = tuple(npycli.errors.causes(error, False))
+    if not all(isinstance(exc, (CLIError, ParsingError)) for exc in causes):
+        return cli.RAISE
+    causes = cast(tuple[CLIError | ParsingError, ...], causes)
+
+    error.cli = error.cli or context.cli
+    error.command = error.command or command
+    print(f"ERROR: {format_cli_error(error)}")
+    for cause in causes:
+        if isinstance(cause, CLIError):
+            cause.cli = cause.cli or context.cli
+            print(f"  CAUSE: {format_cli_error(cause)}")
+        else:
+            print(f"  CAUSE: {format_parsing_error(cause)}")
+
+    return None
+
+
+@cli.middlewares.register.return_value(wrapping=False)
+def return_value_handler(
+    _: MiddlewareContext, command: npycli.abc.Command, return_value: Any
+) -> Any:
+    """
+    Print return value of command that were executed successfully and return back to callsite of exec/prompt.
+    """
+
+    print(f"{command.name} ->\n  {str(return_value).replace('\n', '  \n')}")
+    return return_value
+
+
 async def main() -> None:
     cli.middlewares.wrap_command_execution_info_middleware(
-        create_global_help_command_execution_info_middleare()
+        create_global_help_command_execution_info_middleware()
     )
     while True:
         try:
-            # Asynchronously wait for input in another thread to not block this event loop
-            try:
-                user_input: str = await asyncio.to_thread(
-                    input, cli.prompt_entry_marker
-                )
-            except KeyboardInterrupt:
+            return_value: Any = await cli.prompt()
+            if return_value is quit:
                 break
-
-            if (
-                await async_task_executor_result(
-                    cli.exec(cli.middlewares.split(user_input))
-                )
-            ) is quit:
-                break
-        except asyncio.CancelledError as cancellation:
+        except KeyboardInterrupt:  # Assumed to not be handled by middlware
+            break
+        except (
+            asyncio.CancelledError
+        ) as cancellation:  # Assumed to not be handled by middlware
             if cancellation.__cause__ or cancellation.__context__:
                 raise
             break
-        except EmptyEntriesError:  # If the user entered nothing, just continue
+        except EmptyEntriesError:  # Never handled by middlewares
             pass
-        except (
-            CLIError
-        ) as err:  # Catch errors that occur between here and execution of command
-            print(f"{err.__class__.__name__}: {err.args[0]}")
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        ...
+    asyncio.run(main())
