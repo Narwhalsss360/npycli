@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Self, TypeGuard, override
 from weakref import WeakKeyDictionary
 
-from npycli.parameters import CommandParameter, CommandParameterParser, Parsers
+from npycli.parameters import CommandParameter
+from npycli.parsing import CommandParameterParser, Parsers
 
 from ..abc import command as abccommand
 from ..abc.command import (

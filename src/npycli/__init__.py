@@ -1,4 +1,4 @@
-from . import abc, ansi, cli, command, errors, kwarg_aliasing, parameters, parsing
+from . import abc, ansi, cli, command, errors, parameters, parsing
 from . import ansi as ecma48
 from .cli import CLI
 from .command import Command
@@ -21,6 +21,7 @@ from .parameters import (
     ParameterKind,
     ParseHooks,
 )
+from .parsing import CommandParameterParser, Parsers, parse_parameters
 
 __all__ = [
     "CLI",
@@ -31,6 +32,7 @@ __all__ = [
     "CommandArgumentError",
     "CommandDoesNotExistError",
     "CommandParameter",
+    "CommandParameterParser",
     "CustomAttribute",
     "DefaultPreview",
     "Description",
@@ -38,6 +40,7 @@ __all__ = [
     "MissingKeywordArgumentValueError",
     "ParameterKind",
     "ParseHooks",
+    "Parsers",
     "ParsingError",
     "TooManyArgumentsError",
     "abc",
@@ -46,7 +49,7 @@ __all__ = [
     "command",
     "ecma48",
     "errors",
-    "kwarg_aliasing",
     "parameters",
+    "parse_parameters",
     "parsing",
 ]

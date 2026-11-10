@@ -8,9 +8,9 @@ from typing import Any, Self
 
 from ..errors import CLIError, CommandDoesNotExistError, EmptyEntriesError
 from ..middleware import (
+    CommandExecutionInfoHandlerInfo,
     CommandExecutionInfoMiddlewareHandler,
     CommandExecutionInfoMiddlewareResult,
-    CommandForMiddlewareHandlerInfo,
     ErrorMiddlewareHandler,
     ErrorMiddlewareHandlerInfo,
     ExecutorMiddlewareHandler,
@@ -26,7 +26,7 @@ from ..middleware import (
     sync,
     wrap_sync,
 )
-from ..parameters import CommandParameterParser, Parsers
+from ..parsing import CommandParameterParser, Parsers
 from .command import Command
 
 type ReturnValueHandler = Callable[[Command, Any], Any]
@@ -170,7 +170,7 @@ class CLI(ABC):
                     MiddlewareContext(self.cli),
                 )
             )
-            self._command_execution_info_handler_handler_info: CommandForMiddlewareHandlerInfo = CommandForMiddlewareHandlerInfo(
+            self._command_execution_info_handler_handler_info: CommandExecutionInfoHandlerInfo = CommandExecutionInfoHandlerInfo(
                 CLI.MiddlewareManager.async_default_command_execution_info,
                 MiddlewareContext(self.cli),
             )
@@ -204,7 +204,7 @@ class CLI(ABC):
                     MiddlewareContext(self.cli),
                 )
             )
-            self._command_execution_info_handler_handler_info: CommandForMiddlewareHandlerInfo = CommandForMiddlewareHandlerInfo(
+            self._command_execution_info_handler_handler_info: CommandExecutionInfoHandlerInfo = CommandExecutionInfoHandlerInfo(
                 CLI.MiddlewareManager.sync_default_command_execution_info,
                 MiddlewareContext(self.cli),
             )

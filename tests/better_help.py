@@ -3,8 +3,7 @@ from typing import Annotated
 
 import npycli
 from npycli import CLI, CommandDoesNotExistError, EmptyEntriesError
-from npycli.kwarg_aliasing import alias_cmd_kwargs
-from npycli.parameters import CommandParameter, Description
+from npycli.parameters import Alias, CommandParameter, Description
 
 TAB_CHARS: str = " " * 4
 
@@ -22,8 +21,7 @@ def user_items() -> dict[str, str]:
 
 
 @cli.cmd(name="add")
-@alias_cmd_kwargs({"key": ("k",), "value": ("v",)})
-def add_item(key: str, value: str) -> str:
+def add_item(key: Annotated[str, Alias("k")], value: Annotated[str, Alias("v")]) -> str:
     if key in user_items():
         return f"Key {key} already exists"
     user_items()[key] = value

@@ -12,10 +12,9 @@ from npycli.errors import CommandArgumentError, ParsingError
 from npycli.middleware import wrap_sync
 from npycli.parameters import (
     CommandParameter,
-    CommandParameterParser,
     ParameterKind,
-    Parsers,
 )
+from npycli.parsing import CommandParameterParser, Parsers
 
 type ParameterExtractor = Callable[[Callable[..., Any]], tuple[CommandParameter, ...]]
 

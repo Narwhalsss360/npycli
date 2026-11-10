@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, Protocol, TypeGuard, cast
 
-from .parameters import CommandParameterParser, Parsers
+from .parsing import CommandParameterParser, Parsers
 
 if TYPE_CHECKING:
     from .abc.cli import CLI
@@ -122,7 +122,7 @@ class SplitMiddlewareHandlerInfo(
 
 
 @dataclass
-class CommandForMiddlewareHandlerInfo(
+class CommandExecutionInfoHandlerInfo(
     HandlerInfo[
         [Sequence[str]], OptionallyAwaitable[CommandExecutionInfoMiddlewareResult]
     ]

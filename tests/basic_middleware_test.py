@@ -13,7 +13,8 @@ from npycli.middleware import (
     ExecutorMiddlewareResult,
     MiddlewareContext,
 )
-from npycli.parameters import CommandParameter, ParameterKind, Parsers, parse_parameters
+from npycli.parameters import CommandParameter, ParameterKind
+from npycli.parsing import Parsers, parse_parameters
 
 cli = CLI("async program")
 

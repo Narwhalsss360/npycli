@@ -2,14 +2,13 @@ import json
 from math import ceil
 from os.path import isfile
 from types import FrameType
-from typing import IO, Any
+from typing import IO, Annotated, Any
 
 from npycli import CLI, CLIError, EmptyEntriesError
 from npycli.abc import command as abccommand
 from npycli.command import cmd
 from npycli.errors import causes
-from npycli.kwarg_aliasing import alias_cmd_kwargs
-from npycli.parameters import CommandParameter
+from npycli.parameters import Alias, CommandParameter
 
 USER_ITEMS_FILE = "user-items.gitignore.json"
 TAB_WIDTH: int = 4
@@ -50,8 +49,7 @@ def commit() -> dict[str, str]:
 
 
 @cli.cmd(names=("add", "new"), help="Add a new key-value pair.")
-@alias_cmd_kwargs({"key": ("k",), "value": ("v",)})
-def add_cmd(key: str, value: str) -> str:
+def add_cmd(key: Annotated[str, Alias("k")], value: Annotated[str, Alias("v")]) -> str:
     if key in items():
         raise KeyError(f"Key {key} already exists.")
     items()[key] = value
@@ -60,8 +58,7 @@ def add_cmd(key: str, value: str) -> str:
 
 
 @cli.cmd(names=("set", "change"), help="Change an the existing value of a key.")
-@alias_cmd_kwargs({"key": ("k",), "value": ("v",)})
-def set_cmd(key: str, value: str) -> str:
+def set_cmd(key: Annotated[str, Alias("k")], value: Annotated[str, Alias("v")]) -> str:
     if key not in items():
         raise KeyError(f"Key {key} does not exist. Use {cmd(add_cmd).name}.")
     items()[key] = value
@@ -72,8 +69,7 @@ def set_cmd(key: str, value: str) -> str:
 @cli.cmd(
     names=("delete", "del", "remove", "rm"), help="Delete an existing key-value pair."
 )
-@alias_cmd_kwargs({"key": ("k",)})
-def delete_cmd(key: str) -> str:
+def delete_cmd(key: Annotated[str, Alias("k")]) -> str:
     value: str = items().pop(key)
     commit()
     return f"Deleted:\n{key}:{value}"
@@ -82,8 +78,7 @@ def delete_cmd(key: str) -> str:
 @cli.cmd(
     names=("show", "print"), help="Show a specific or all existing key-value pair(s)."
 )
-@alias_cmd_kwargs({"key": ("k",)})
-def show_cmd(key: str | None = None) -> str:
+def show_cmd(key: Annotated[str | None, Alias("k")] = None) -> str:
     if key is None:
         longest_length: int = max(len(s) for s in items())
         tab_count: int = ceil(longest_length / TAB_WIDTH)

@@ -4,7 +4,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Self, TypeGuard, override
 
-from npycli.parameters import CommandParameter, CommandParameterParser, Parsers
+from npycli.parameters import CommandParameter
+from npycli.parsing import CommandParameterParser, Parsers
 
 from .abc import command as abccommand
 from .abc.command import (
