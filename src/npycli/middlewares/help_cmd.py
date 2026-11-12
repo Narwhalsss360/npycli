@@ -15,8 +15,9 @@ from ..abc.command import (
 )
 
 
-def use_help_command[CommandType: Command](
+def create_help_command[CommandType: Command](
     cli: CLI,
+    preamble: str = "",
     name_or_names: str | tuple[str, ...] = "help",
     parameter_extractor: ParameterExtractor = default_parameter_extractor,
     help_extractor: HelpExtractor = default_help_extractor,
@@ -127,7 +128,7 @@ def use_help_command[CommandType: Command](
             if single_command_cli is not None:
                 if len(cli.commands) != 2 or single_command_cli not in cli.commands:
                     raise TypeError(
-                        f"The single_command_cli paremeter for {use_help_command.__name__} requires the CLI to have a single command plus the help command."
+                        f"The single_command_cli paremeter for {create_help_command.__name__} requires the CLI to have a single command plus the help command."
                     )
 
                 output = generate_help_string_for(
@@ -147,6 +148,9 @@ def use_help_command[CommandType: Command](
                 __command, parameter, extended, description
             )
 
+        if single_command_cli and preamble:
+            output = f"{preamble}\n{output}"
+
         output.replace("\n", f"{line_prefix}\n")
         if print_to:
             print(output, end=print_end, file=print_to, flush=print_flush)
@@ -164,5 +168,37 @@ def use_help_command[CommandType: Command](
         kwarg_prefix=kwarg_prefix,
     )
 
-    cli.add_command(command)
     return command
+
+
+def use_help_command[CommandType: Command](
+    cli: CLI,
+    name_or_names: str | tuple[str, ...] = "help",
+    parameter_extractor: ParameterExtractor = default_parameter_extractor,
+    help_extractor: HelpExtractor = default_help_extractor,
+    kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+    command_cls: type[CommandType] = sync_command.Command,
+    line_prefix: str = "",
+    commands_joiner: str = "\n",
+    print_to: TextIO | None = None,
+    print_end: str = "\n",
+    print_flush: bool = False,
+    single_command_cli: Command | None = None,
+) -> CLI:
+    cli.add_command(
+        create_help_command(
+            cli,
+            name_or_names=name_or_names,
+            parameter_extractor=parameter_extractor,
+            help_extractor=help_extractor,
+            kwarg_prefix=kwarg_prefix,
+            command_cls=command_cls,
+            line_prefix=line_prefix,
+            commands_joiner=commands_joiner,
+            print_to=print_to,
+            print_end=print_end,
+            print_flush=print_flush,
+            single_command_cli=single_command_cli,
+        )
+    )
+    return cli
