@@ -7,7 +7,11 @@ from typing import IO, Annotated, Any
 from npycli import CLI, CLIError, EmptyEntriesError
 from npycli.abc import command as abccommand
 from npycli.command import cmd
-from npycli.errors import causes
+from npycli.errors import ParsingError, causes
+from npycli.middlewares.cli_error_printer import (
+    full_cli_error_string,
+    use_cli_error_printer,
+)
 from npycli.middlewares.global_help import use_global_help_flag
 from npycli.middlewares.help_cmd import create_help_command
 from npycli.parameters import Alias
@@ -17,6 +21,7 @@ TAB_WIDTH: int = 4
 
 cli = CLI("user-items")
 use_global_help_flag(cli, create_help_command(cli))
+use_cli_error_printer(cli)
 
 
 def open_user_items_file(mode: str) -> IO[Any]:
@@ -100,15 +105,6 @@ def retvals(command: abccommand.Command, return_value: Any | None) -> Any | None
     print(f"{command.name}:\n{return_value}")
 
 
-@cli.errors()
-def errors(command: abccommand.Command, exc: Exception) -> Any | None:
-    errors_string: str = "\n".join(
-        [f"{' ' * TAB_WIDTH}{e.__class__.__name__}: {e}" for e in causes(exc, True)]
-    )
-    print(f"{command.name} error:\n{errors_string}")
-    return None
-
-
 def as_prompter() -> None:
     print("Program style: as_prompter")
     while True:
@@ -122,7 +118,18 @@ def as_prompter() -> None:
         except (
             CLIError
         ) as err:  # Catch errors that occur between here and execution of command
-            print(f"{err.__class__.__name__}: {err.args[0]}")
+            print(
+                full_cli_error_string(
+                    cli,
+                    err,
+                    tuple(
+                        cause
+                        for cause in causes(err, False)
+                        if isinstance(cause, (CLIError, ParsingError))
+                    ),
+                    ansi=True,
+                )
+            )
 
 
 def as_cli_program() -> None:
@@ -136,7 +143,18 @@ def as_cli_program() -> None:
     except (
         CLIError
     ) as err:  # Catch errors that occur between here and execution of command
-        print(f"{err.__class__.__name__}: {err.args[0]}")
+        print(
+            full_cli_error_string(
+                cli,
+                err,
+                tuple(
+                    cause
+                    for cause in causes(err, False)
+                    if isinstance(cause, (CLIError, ParsingError))
+                ),
+                ansi=True,
+            )
+        )
 
 
 if __name__ == "__main__":
