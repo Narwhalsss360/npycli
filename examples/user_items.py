@@ -6,16 +6,17 @@ from typing import IO, Annotated, Any
 
 from npycli import CLI, CLIError, EmptyEntriesError
 from npycli.abc import command as abccommand
-from npycli.command import Command, cmd
+from npycli.command import cmd
 from npycli.errors import causes
-from npycli.middlewares.help_cmd import use_help_command
+from npycli.middlewares.global_help import use_global_help_flag
+from npycli.middlewares.help_cmd import create_help_command
 from npycli.parameters import Alias
 
 USER_ITEMS_FILE = "user-items.gitignore.json"
 TAB_WIDTH: int = 4
 
 cli = CLI("user-items")
-help_cmd: Command = use_help_command(cli)
+use_global_help_flag(cli, create_help_command(cli))
 
 
 def open_user_items_file(mode: str) -> IO[Any]:

@@ -3,7 +3,8 @@ from pathlib import Path
 from sys import argv, exit, stderr, stdout
 from typing import Annotated
 
-from npycli.middlewares.help_cmd import use_help_command
+from npycli.middlewares.global_help import use_global_help_flag
+from npycli.middlewares.help_cmd import create_help_command
 
 try:
     from aiohttp import ClientError, ClientResponseError, ClientSession
@@ -87,12 +88,20 @@ async def main() -> int:
     cli = CLI(Path(__file__).name.replace(".py", ""))
     cmd: Command = await Command.create(ignore_templates, cli.title)
     cli.add_command(cmd)
-    help_command: Command = use_help_command(
-        cli, command_cls=Command, single_command_cli=cmd, print_to=stdout
+    help_command_name: str = "help"
+    use_global_help_flag(
+        cli,
+        create_help_command(
+            cli,
+            cmd.help or "",
+            help_command_name,
+            print_to=stdout,
+            single_command_cli=cmd,
+        ),
     )
 
     if len(argv) == 1:
-        await cli.exec((help_command.name,))
+        await cli.exec((help_command_name,))
         return 0
 
     try:

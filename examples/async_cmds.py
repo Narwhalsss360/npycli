@@ -5,10 +5,10 @@ from typing import Any
 import npycli
 from npycli import CLIError, EmptyEntriesError
 from npycli.asyncio.cli import CLI
-from npycli.middlewares.help_cmd import use_help_command
+from npycli.middlewares.help_cmd import create_help_command
 
 cli = CLI("async program")
-help_cmd = use_help_command(cli)
+help_cmd = create_help_command(cli)
 
 
 @cli.cmd("do-async-operation")
