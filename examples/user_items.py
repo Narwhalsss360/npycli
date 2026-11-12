@@ -6,14 +6,16 @@ from typing import IO, Annotated, Any
 
 from npycli import CLI, CLIError, EmptyEntriesError
 from npycli.abc import command as abccommand
-from npycli.command import cmd
+from npycli.command import Command, cmd
 from npycli.errors import causes
-from npycli.parameters import Alias, CommandParameter
+from npycli.middlewares.help_cmd import use_help_command
+from npycli.parameters import Alias
 
 USER_ITEMS_FILE = "user-items.gitignore.json"
 TAB_WIDTH: int = 4
 
 cli = CLI("user-items")
+help_cmd: Command = use_help_command(cli)
 
 
 def open_user_items_file(mode: str) -> IO[Any]:
@@ -88,59 +90,6 @@ def show_cmd(key: Annotated[str | None, Alias("k")] = None) -> str:
         return result
     else:
         return f"{key}:{items()[key]}"
-
-
-@cli.cmd(
-    name="help",
-    help=(
-        "<...>: Positional or Keyword\n"
-        "<*...>: Variable Positional\n"
-        "<**...>: Variable Keyword\n"
-        "/: Positional / Keyword Only Delimiter\n"
-        "<: ...>: Type\n"
-        "<: = ...>: Default Value\n"
-        "[...]: Boolean Flag (Keyword only, no value needed)\n"
-    ),
-)
-def help_cmd(
-    command_name: str | None = None,
-    parameter_name: str | None = None,
-    /,
-    extended: bool = False,
-) -> str:
-    if extended:
-        command_help, parameter_help = (
-            abccommand.Command.extended_command_help,
-            CommandParameter.extended_parameter_help,
-        )
-    else:
-        command_help, parameter_help = (
-            abccommand.Command.basic_command_help,
-            CommandParameter.basic_parameter_help,
-        )
-
-    if command_name is None:
-        out: str = ""
-        for i, command in enumerate(cli.commands):
-            out += f"{command_help(command)}"
-            if i != len(cli.commands) - 1:
-                out += "\n"
-        return out
-
-    if (command := cli.get_command(command_name)) is None:
-        return f"{command_name} is not a command."
-
-    if parameter_name is not None:
-        if (
-            parameter := next(
-                filter(lambda p: parameter_name in p.names, command.parameters)
-            ),
-            None,
-        ) is None:  # type: ignore
-            return f"'{parameter_name}' is not a parameter"
-        return parameter_help(parameter)
-
-    return command_help(command)
 
 
 @cli.retvals()

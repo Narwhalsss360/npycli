@@ -1,7 +1,9 @@
 from asyncio import CancelledError, gather, run
 from pathlib import Path
-from sys import argv, exit, stderr
+from sys import argv, exit, stderr, stdout
 from typing import Annotated
+
+from npycli.middlewares.help_cmd import use_help_command
 
 try:
     from aiohttp import ClientError, ClientResponseError, ClientSession
@@ -15,9 +17,9 @@ from npycli.ansi.const.sgr import (
     RED_DISPLAY,
 )
 from npycli.ansi.sequences import SGR
-from npycli.asyncio import Command, command
+from npycli.asyncio import CLI, Command, command
 from npycli.errors import CommandArgumentError
-from npycli.parameters import AnnotationPreview
+from npycli.parameters import AnnotationPreview, Description
 
 
 def print_error(exc: Exception) -> None:
@@ -47,8 +49,18 @@ async def fetch_string(session: ClientSession, url: str) -> str:
 
 
 async def ignore_templates(
-    *templates: Annotated[str, AnnotationPreview("'*.gitignore'")],
+    *templates: Annotated[
+        str,
+        AnnotationPreview("'*.gitignore'"),
+        Description(
+            "A variable positional count argument of the gitignore template to fetch from github's gitingnore repository. The path of the file from the root of the repository."
+        ),
+    ],
 ) -> None:
+    """
+    Generate an ignore template fetched from github/gitignore repository.
+    """
+
     this_cmd: Command = command.require_async_cmd(command.cmd(ignore_templates))
     for template_name in templates:
         if not template_name.endswith(".gitignore"):
@@ -72,15 +84,19 @@ async def ignore_templates(
 
 
 async def main() -> int:
-    cmd: Command = await Command.create(
-        ignore_templates, Path(__file__).name.replace(".py", "")
+    cli = CLI(Path(__file__).name.replace(".py", ""))
+    cmd: Command = await Command.create(ignore_templates, cli.title)
+    cli.add_command(cmd)
+    help_command: Command = use_help_command(
+        cli, command_cls=Command, single_command_cli=cmd, print_to=stdout
     )
+
     if len(argv) == 1:
-        print(cmd)
-        return 1
+        await cli.exec((help_command.name,))
+        return 0
 
     try:
-        await cmd(argv[1:])
+        await cli.exec((cmd.name, *argv[1:]))
     except (CommandArgumentError, ClientError) as e:
         print_error(e)
         return 1

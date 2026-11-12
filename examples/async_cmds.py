@@ -5,69 +5,16 @@ from typing import Any
 import npycli
 from npycli import CLIError, EmptyEntriesError
 from npycli.asyncio.cli import CLI
-from npycli.parameters import CommandParameter
+from npycli.middlewares.help_cmd import use_help_command
 
 cli = CLI("async program")
+help_cmd = use_help_command(cli)
 
 
 @cli.cmd("do-async-operation")
 async def do_async_operation(sleeptime: float | None = None) -> None:
     await asyncio.sleep(sleeptime or 1)
     print("Done!")
-
-
-@cli.cmd(
-    name="help",
-    help=(
-        "<...>: Positional or Keyword\n"
-        "<*...>: Variable Positional\n"
-        "<**...>: Variable Keyword\n"
-        "/: Positional / Keyword Only Delimiter\n"
-        "<: ...>: Type\n"
-        "<: = ...>: Default Value\n"
-        "[...]: Boolean Flag (Keyword only, no value needed)\n"
-        f"Keyword prefix: '{cli.kwarg_prefix}'"
-    ),
-)
-def help_cmd(
-    command_name: str | None = None,
-    parameter_name: str | None = None,
-    /,
-    *,
-    extended: bool = False,
-) -> str:
-    if extended:
-        command_help, parameter_help = (
-            npycli.abc.command.Command.extended_command_help,
-            CommandParameter.extended_parameter_help,
-        )
-    else:
-        command_help, parameter_help = (
-            npycli.abc.command.Command.basic_command_help,
-            CommandParameter.basic_parameter_help,
-        )
-
-    if command_name is None:
-        out: str = ""
-        for i, command in enumerate(cli.commands):
-            out += f"{command_help(command)}"
-            if i != len(cli.commands) - 1:
-                out += "\n"
-        return out
-
-    if (command := cli.get_command(command_name)) is None:
-        return f"{command_name} is not a command."
-
-    if parameter_name is not None:
-        if (
-            parameter := next(
-                filter(lambda p: parameter_name in p.names, command.parameters), None
-            )
-        ) is None:
-            return f"'{parameter_name}' is not a parameter"
-        return parameter_help(parameter)
-
-    return command_help(command)
 
 
 async def cleanup():
