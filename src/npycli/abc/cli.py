@@ -739,6 +739,8 @@ class CLI(ABC):
     @kwarg_prefix.setter
     def kwarg_prefix(self, value: str) -> None:
         self._parser.keyword_prefix = value
+        for command in self._commands:
+            command.with_kwarg_prefix(value)
 
     @property
     def argument_separator(self) -> str:
@@ -797,7 +799,7 @@ class CLI(ABC):
         :return: `None`
         """
 
-        self._commands.append(command)
+        self._commands.append(command.with_kwarg_prefix(self.kwarg_prefix))
 
     @abstractmethod
     def cmd[**P, R](
