@@ -31,6 +31,7 @@ def default_parameter_extractor(
             default=parameter.default,
         )
         for parameter in signature(function).parameters.values()
+        if parameter.name not in ("", "_") and annotations.get(parameter.name) is not None
     )
 
 
