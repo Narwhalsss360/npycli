@@ -326,6 +326,10 @@ class CLI(ABC):
                     command_execution_info
                 )
 
+            wrapped: CommandExecutionInfoMiddlewareHandler = (
+                self._command_execution_info_handler_handler_info.handler
+            )
+
             if self.is_async:
 
                 async def async_wrapper(
@@ -333,7 +337,7 @@ class CLI(ABC):
                 ) -> CommandExecutionInfoMiddlewareResult:
                     previous_result: CommandExecutionInfoMiddlewareResult = (
                         await wrap_sync(
-                            self._command_execution_info_handler_handler_info.handler,
+                            wrapped,
                             context,
                             entries,
                         )
@@ -359,7 +363,7 @@ class CLI(ABC):
                     context: MiddlewareContext, entries: Sequence[str]
                 ) -> CommandExecutionInfoMiddlewareResult:
                     previous_result: CommandExecutionInfoMiddlewareResult = sync(
-                        self._command_execution_info_handler_handler_info.handler,
+                        wrapped,
                         context,
                         entries,
                     )
@@ -430,6 +434,10 @@ class CLI(ABC):
             ):
                 return self.set_executor_middleware(executor)
 
+            wrapped: ExecutorMiddlewareHandler = (
+                self._executor_middleware_handler_info.handler
+            )
+
             if self.cli.is_async:
 
                 async def async_wrapper(
@@ -439,7 +447,7 @@ class CLI(ABC):
                     parsers: Parsers | CommandParameterParser,
                 ) -> ExecutorMiddlewareResult:
                     previous_result: ExecutorMiddlewareResult = await wrap_sync(
-                        self._executor_middleware_handler_info.handler,
+                        wrapped,
                         context,
                         command,
                         entries,
@@ -469,7 +477,7 @@ class CLI(ABC):
                     parsers: Parsers | CommandParameterParser,
                 ) -> ExecutorMiddlewareResult:
                     previous_result: ExecutorMiddlewareResult = sync(
-                        self._executor_middleware_handler_info.handler,
+                        wrapped,
                         context,
                         command,
                         entries,
@@ -537,13 +545,17 @@ class CLI(ABC):
             ):
                 return self.set_error_middleware(error_handler)
 
+            wrapped: ErrorMiddlewareHandler = (
+                self._error_middleware_handler_info.handler
+            )
+
             if self.is_async:
 
                 async def async_wrapper(
                     context: MiddlewareContext, command: Command, error: Exception
                 ) -> Any:
                     previous_result: ErrorMiddlewareHandler = await wrap_sync(
-                        self._error_middleware_handler_info.handler,
+                        wrapped,
                         context,
                         command,
                         error,
@@ -568,7 +580,7 @@ class CLI(ABC):
                     context: MiddlewareContext, command: Command, error: Exception
                 ) -> Any:
                     previous_result: ErrorMiddlewareHandler = sync(
-                        self._error_middleware_handler_info.handler,
+                        wrapped,
                         context,
                         command,
                         error,
@@ -623,13 +635,17 @@ class CLI(ABC):
             ):
                 return self.set_return_value_middleware(return_value_handler)
 
+            wrapped: ReturnValueMiddlewareHandler = (
+                self._return_value_middleware_handler_info.handler
+            )
+
             if self.is_async:
 
                 async def async_wrapper(
                     context: MiddlewareContext, command: Command, return_value: Any
                 ) -> Any:
                     previous_result: Any = await wrap_sync(
-                        self._return_value_middleware_handler_info.handler,
+                        wrapped,
                         context,
                         command,
                         return_value,
@@ -654,7 +670,7 @@ class CLI(ABC):
                     context: MiddlewareContext, command: Command, return_value: Any
                 ) -> Any:
                     previous_result: Any = sync(
-                        self._return_value_middleware_handler_info.handler,
+                        wrapped,
                         context,
                         command,
                         return_value,
