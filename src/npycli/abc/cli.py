@@ -897,22 +897,22 @@ class CLI(ABC):
         :return: Command function return value
         """
 
-        if not entries:
-            command_execution_info: CommandExecutionInfoMiddlewareResult = (
-                self.sync_command_execution_info(entries)
-            )
-            if (command := command_execution_info.command) is None:
-                raise EmptyEntriesError("Nothing was entered.", cli=self)
-        else:
-            command_execution_info: CommandExecutionInfoMiddlewareResult = (
-                self.sync_command_execution_info(entries)
-            )
-            if (command := command_execution_info.command) is None:
-                raise CommandDoesNotExistError(
-                    f"Command {entries[0]} does not exist.", cli=self
-                )
-
         try:
+            if not entries:
+                command_execution_info: CommandExecutionInfoMiddlewareResult = (
+                    self.sync_command_execution_info(entries)
+                )
+                if (command := command_execution_info.command) is None:
+                    raise EmptyEntriesError("Nothing was entered.", cli=self)
+            else:
+                command_execution_info: CommandExecutionInfoMiddlewareResult = (
+                    self.sync_command_execution_info(entries)
+                )
+                if (command := command_execution_info.command) is None:
+                    raise CommandDoesNotExistError(
+                        f"Command {entries[0]} does not exist.", cli=self
+                    )
+
             command, return_value = self._middleware_manager.sync_executor(
                 command, command_execution_info.arg_entries, self._parser
             )
@@ -944,22 +944,22 @@ class CLI(ABC):
         """
 
         await self
-        if not entries:
-            command_execution_info: CommandExecutionInfoMiddlewareResult = (
-                await self.async_command_execution_info(entries)
-            )
-            if (command := command_execution_info.command) is None:
-                raise EmptyEntriesError("Nothing was entered.", cli=self)
-        else:
-            command_execution_info: CommandExecutionInfoMiddlewareResult = (
-                await self.async_command_execution_info(entries)
-            )
-            if (command := command_execution_info.command) is None:
-                raise CommandDoesNotExistError(
-                    f"Command {entries[0]} does not exist.", cli=self
-                )
-
         try:
+            if not entries:
+                command_execution_info: CommandExecutionInfoMiddlewareResult = (
+                    await self.async_command_execution_info(entries)
+                )
+                if (command := command_execution_info.command) is None:
+                    raise EmptyEntriesError("Nothing was entered.", cli=self)
+            else:
+                command_execution_info: CommandExecutionInfoMiddlewareResult = (
+                    await self.async_command_execution_info(entries)
+                )
+                if (command := command_execution_info.command) is None:
+                    raise CommandDoesNotExistError(
+                        f"Command {entries[0]} does not exist.", cli=self
+                    )
+
             command, return_value = await self._middleware_manager.async_executor(
                 command, command_execution_info.arg_entries, self.parsers
             )
