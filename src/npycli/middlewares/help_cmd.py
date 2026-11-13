@@ -135,10 +135,12 @@ def create_help_command[CommandType: Command](
                     single_command_cli, parameter, extended, description
                 )
             else:
-                output = commands_joiner.join(
-                    generate_help_string_for(__command, None, extended, description)
-                    for __command in cli.commands
-                )
+                output = f"{preamble}\n{
+                    commands_joiner.join(
+                        generate_help_string_for(__command, None, extended, description)
+                        for __command in cli.commands
+                    )
+                }"
         else:
             if (__command := cli.get_command(_command)) is None:
                 raise CLIError(

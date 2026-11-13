@@ -91,6 +91,7 @@ def create_cli_error_printer(
     cli_error_return_value: Callable[
         [MiddlewareContext, Command, CLIError], Any
     ] = default_cli_error_return_value,
+    raise_on: tuple[type[Exception, ...]] = (),
 ) -> ErrorMiddlewareHandler:
     def cli_error_printer_error_handler(
         context: MiddlewareContext, command: npycli.abc.Command, error: Exception
@@ -104,7 +105,8 @@ def create_cli_error_printer(
             return context.previous_result
 
         if isinstance(
-            error, (asyncio.CancelledError, KeyboardInterrupt, MiddlewareError)
+            error,
+            ((asyncio.CancelledError, KeyboardInterrupt, MiddlewareError), *raise_on),
         ):
             return context.cli.RAISE
 
@@ -151,6 +153,7 @@ def use_cli_error_printer(
     cli_error_return_value: Callable[
         [MiddlewareContext, Command, CLIError], Any
     ] = default_cli_error_return_value,
+    raise_on: tuple[type[Exception, ...]] = (),
 ) -> CLI:
     cli.middlewares.wrap_error_middleware(
         create_cli_error_printer(
@@ -162,6 +165,7 @@ def use_cli_error_printer(
             format_cli_error,
             format_parsing_error,
             cli_error_return_value,
+            raise_on,
         )
     )
     return cli

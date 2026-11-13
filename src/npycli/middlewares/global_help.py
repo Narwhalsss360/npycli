@@ -39,6 +39,9 @@ def create_global_help_flag_command_execution_info(
             if len(entries) == 0:
                 return CommandExecutionInfoMiddlewareResult(None, entries)
 
+            if len(entries) == 1 and entries[0] == f"{context.cli.kwarg_prefix}{global_help_flag}":
+                return CommandExecutionInfoMiddlewareResult(help_command, ())
+
             command = context.cli.get_command(entries[0])
             arg_entries = entries[1:]
 
