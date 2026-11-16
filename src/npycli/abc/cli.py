@@ -748,6 +748,12 @@ class CLI(ABC):
     def parser(self) -> CommandParameterParser:
         return self._parser
 
+    @parser.setter
+    def parser(self, value: CommandParameterParser) -> None:
+        self._parser = value
+        for command in self._commands:
+            command.with_default_parser(self._parser)
+
     @property
     def parsers(self) -> Parsers:
         return self._parser.parsers
@@ -760,7 +766,7 @@ class CLI(ABC):
     def kwarg_prefix(self, value: str) -> None:
         self._parser.keyword_prefix = value
         for command in self._commands:
-            command.with_kwarg_prefix(value)
+            command.with_default_parser(self._parser)
 
     @property
     def argument_separator(self) -> str:
@@ -819,7 +825,7 @@ class CLI(ABC):
         :return: `None`
         """
 
-        self._commands.append(command.with_kwarg_prefix(self.kwarg_prefix))
+        self._commands.append(command.with_default_parser(self._parser))
 
     @abstractmethod
     def cmd[**P, R](
