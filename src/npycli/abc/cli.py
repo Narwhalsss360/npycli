@@ -61,37 +61,37 @@ class CLI(ABC):
             def __init__(self, middleware_manager: CLI.MiddlewareManager) -> None:
                 self._middlware_manager: CLI.MiddlewareManager = middleware_manager
 
-            def prompt(
+            def prompt[F: PromptMiddlewareHandler](
                 self,
-            ) -> Callable[[PromptMiddlewareHandler], PromptMiddlewareHandler]:
+            ) -> Callable[[F], F]:
                 def decorator(
-                    prompter: PromptMiddlewareHandler,
-                ) -> PromptMiddlewareHandler:
+                    prompter: F,
+                ) -> F:
                     self._middlware_manager.set_prompt_middleware(prompter)
                     return prompter
 
                 return decorator
 
-            def split(
+            def split[F: SplitMiddlewareHandler](
                 self,
-            ) -> Callable[[SplitMiddlewareHandler], SplitMiddlewareHandler]:
+            ) -> Callable[[F], F]:
                 def decorator(
-                    splitter: SplitMiddlewareHandler,
-                ) -> SplitMiddlewareHandler:
+                    splitter: F,
+                ) -> F:
                     self._middlware_manager.set_split_middleware(splitter)
                     return splitter
 
                 return decorator
 
-            def command_execution_info(
+            def command_execution_info[F: CommandExecutionInfoMiddlewareHandler](
                 self, wrapping: bool = True
             ) -> Callable[
-                [CommandExecutionInfoMiddlewareHandler],
-                CommandExecutionInfoMiddlewareHandler,
+                [F],
+                F,
             ]:
                 def decorator(
-                    command_execution_info: CommandExecutionInfoMiddlewareHandler,
-                ) -> CommandExecutionInfoMiddlewareHandler:
+                    command_execution_info: F,
+                ) -> F:
                     if wrapping:
                         self._middlware_manager.wrap_command_execution_info_middleware(
                             command_execution_info
@@ -104,12 +104,12 @@ class CLI(ABC):
 
                 return decorator
 
-            def executor(
+            def executor[F: ExecutorMiddlewareHandler](
                 self, wrapping: bool = True
-            ) -> Callable[[ExecutorMiddlewareHandler], ExecutorMiddlewareHandler]:
+            ) -> Callable[[F], F]:
                 def decorator(
-                    executor: ExecutorMiddlewareHandler,
-                ) -> ExecutorMiddlewareHandler:
+                    executor: F,
+                ) -> F:
                     if wrapping:
                         self._middlware_manager.wrap_executor_middleware(executor)
                     else:
@@ -118,12 +118,12 @@ class CLI(ABC):
 
                 return decorator
 
-            def error(
+            def error[F: ErrorMiddlewareHandler](
                 self, wrapping: bool = True
-            ) -> Callable[[ErrorMiddlewareHandler], ErrorMiddlewareHandler]:
+            ) -> Callable[[F], F]:
                 def decorator(
-                    error_handler: ErrorMiddlewareHandler,
-                ) -> ErrorMiddlewareHandler:
+                    error_handler: F,
+                ) -> F:
                     if wrapping:
                         self._middlware_manager.wrap_error_middleware(error_handler)
                     else:
@@ -132,12 +132,12 @@ class CLI(ABC):
 
                 return decorator
 
-            def return_value(
+            def return_value[F: ReturnValueMiddlewareHandler](
                 self, wrapping: bool = True
-            ) -> Callable[[ReturnValueMiddlewareHandler], ReturnValueMiddlewareHandler]:
+            ) -> Callable[[F], F]:
                 def decorator(
-                    return_value: ReturnValueMiddlewareHandler,
-                ) -> ReturnValueMiddlewareHandler:
+                    return_value: F,
+                ) -> F:
                     if wrapping:
                         self._middlware_manager.wrap_return_value_middleware(
                             return_value
@@ -828,24 +828,24 @@ class CLI(ABC):
         self._commands.append(command.with_default_parser(self._parser))
 
     @abstractmethod
-    def cmd[**P, R](
+    def cmd[F: Callable[..., Any]](
         self,
         name: str | None = None,
         names: tuple[str, ...] | None = None,
         help: str | None = None,
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
+    ) -> Callable[[F], F]: ...
 
-    def retvals(
+    def retvals[F: ReturnValueHandler](
         self,
-    ) -> Callable[[ReturnValueHandler], ReturnValueHandler]:
+    ) -> Callable[[F], F]:
         """
         Curry function that creates a decorator to specify a return value handler function.
         :return: Decorator
         """
 
         def decorator(
-            function: ReturnValueHandler,
-        ) -> ReturnValueHandler:
+            function: F,
+        ) -> F:
             if self.is_async:
 
                 async def wrapper(
@@ -862,17 +862,17 @@ class CLI(ABC):
 
         return decorator
 
-    def errors(
+    def errors[F: ErrorHandler](
         self,
-    ) -> Callable[[ErrorHandler], ErrorHandler]:
+    ) -> Callable[[F], F]:
         """
         Curry function that creates a decorator to specify an error handler function.
         :return: Decorator
         """
 
         def decorator(
-            function: Callable[[Command, Exception], None],
-        ) -> Callable[[Command, Exception], None]:
+            function: F,
+        ) -> F:
 
             if self.is_async:
 

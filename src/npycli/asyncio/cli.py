@@ -15,20 +15,16 @@ class CLI(abccli.CLI):
     def is_async(self) -> bool:
         return True
 
-    def cmd[**P, R](
+    @override
+    def cmd[F: Callable[..., Any]](
         self,
         name: str | None = None,
         names: tuple[str, ...] | None = None,
         help: str | None = None,
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
-        def decorator(function: Callable[P, R]) -> Callable[P, R]:
+    ) -> Callable[[F], F]:
+        def decorator(function: F) -> F:
             self.add_command(
-                Command.create(
-                    function=function,
-                    name=name,
-                    names=names,
-                    help=help
-                )
+                Command.create(function=function, name=name, names=names, help=help)
             )
             return function
 
