@@ -237,11 +237,15 @@ class Command(ABC):
 
         parser: CommandParameterParser
         if parsers is None:
-            parser = CommandParameterParser(self.kwarg_prefix, self.kwarg_prefix, {})
+            parser = self.default_parser
         elif isinstance(parsers, CommandParameterParser):
             parser = parsers
         else:
-            parser = self.default_parser
+            parser = CommandParameterParser(
+                self.default_parser.keyword_prefix,
+                self.default_parser.argument_separator,
+                parsers,
+            )
         self.with_kwarg_prefix(parser.keyword_prefix)
 
         try:
@@ -265,11 +269,16 @@ class Command(ABC):
     ) -> Any:
         parser: CommandParameterParser
         if parsers is None:
-            parser = CommandParameterParser(self.kwarg_prefix, self.kwarg_prefix, {})
+            parser = self.default_parser
         elif isinstance(parsers, CommandParameterParser):
             parser = parsers
         else:
-            parser = self.default_parser
+            parser = CommandParameterParser(
+                self.default_parser.keyword_prefix,
+                self.default_parser.argument_separator,
+                parsers,
+            )
+
         try:
             args, kwargs = parser.parse(self.parameters, entries)
             return await wrap_sync(self.function, *args, **kwargs)
