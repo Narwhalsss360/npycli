@@ -80,7 +80,7 @@ type ExecutorMiddlewareHandler = MiddlewareHandler[
 ]
 
 type ErrorMiddlewareHandler = MiddlewareHandler[
-    [Command, Exception], OptionallyAwaitable[Any]
+    [Command | None, Exception], OptionallyAwaitable[Any]
 ]
 
 type ReturnValueMiddlewareHandler = MiddlewareHandler[
@@ -142,7 +142,7 @@ class ExecutorMiddlewareHandlerInfo(
 
 @dataclass
 class ErrorMiddlewareHandlerInfo(
-    HandlerInfo[["Command", Exception], OptionallyAwaitable[Any]]
+    HandlerInfo[["Command | None", Exception], OptionallyAwaitable[Any]]
 ):
     pass
 

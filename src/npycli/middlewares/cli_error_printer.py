@@ -29,7 +29,7 @@ def default_format_parsing_error(
 
 
 def default_cli_error_return_value(
-    context: MiddlewareContext, command: Command, error: CLIError
+    context: MiddlewareContext, command: Command | None, error: CLIError
 ) -> Any:
     return None
 
@@ -89,12 +89,12 @@ def create_cli_error_printer(
         [CLI, ParsingError, bool], str
     ] = default_format_parsing_error,
     cli_error_return_value: Callable[
-        [MiddlewareContext, Command, CLIError], Any
+        [MiddlewareContext, Command | None, CLIError], Any
     ] = default_cli_error_return_value,
-    raise_on: tuple[type[Exception, ...]] = (),
+    raise_on: tuple[type[Exception], ...] = (),
 ) -> ErrorMiddlewareHandler:
     def cli_error_printer_error_handler(
-        context: MiddlewareContext, command: npycli.abc.Command, error: Exception
+        context: MiddlewareContext, command: npycli.abc.Command | None, error: Exception
     ) -> Any:
         """
         Handles CLIErrors, if not all causes were ParsingErrors or CLIError, then just raise the exception up the frame stack.
@@ -151,9 +151,9 @@ def use_cli_error_printer(
         [CLI, ParsingError, bool], str
     ] = default_format_parsing_error,
     cli_error_return_value: Callable[
-        [MiddlewareContext, Command, CLIError], Any
+        [MiddlewareContext, Command | None, CLIError], Any
     ] = default_cli_error_return_value,
-    raise_on: tuple[type[Exception, ...]] = (),
+    raise_on: tuple[type[Exception], ...] = (),
 ) -> CLI:
     cli.middlewares.wrap_error_middleware(
         create_cli_error_printer(

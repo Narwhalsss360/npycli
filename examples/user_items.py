@@ -117,7 +117,7 @@ def as_prompter() -> None:
             pass
         except (
             CLIError
-        ) as err:  # Catch errors that occur between here and execution of command
+        ) as err:  # Catch errors that occur between here and execution of command that are not handled by the error middleware
             print(
                 full_cli_error_string(
                     cli,
@@ -142,7 +142,7 @@ def as_cli_program() -> None:
         pass
     except (
         CLIError
-    ) as err:  # Catch errors that occur between here and execution of command
+    ) as err:  # Catch errors that occur between here and execution of command that are not handled by the error middleware
         print(
             full_cli_error_string(
                 cli,

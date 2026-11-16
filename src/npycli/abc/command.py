@@ -5,7 +5,7 @@ from asyncio import gather
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from inspect import getdoc, signature
-from typing import Any, ClassVar, Self, get_type_hints
+from typing import Any, ClassVar, Self, cast, get_type_hints
 from weakref import ReferenceType, WeakKeyDictionary, ref
 
 from npycli.errors import CommandArgumentError, ParsingError
@@ -31,7 +31,8 @@ def default_parameter_extractor(
             default=parameter.default,
         )
         for parameter in signature(function).parameters.values()
-        if parameter.name not in ("", "_") and annotations.get(parameter.name) is not None
+        if parameter.name not in ("", "_")
+        and annotations.get(parameter.name) is not None
     )
 
 
@@ -53,12 +54,12 @@ def default_help_extractor(
 
 
 class CommandAttributes:
-    __slots__ = ("_details", "_has_invoked_callbacks", "_kwarg_prefix")
+    __slots__ = ("_default_parser", "_details", "_has_invoked_callbacks")
 
     def __init__(self) -> None:
         self._details: list[str] = []
         self._has_invoked_callbacks: bool = False
-        self._kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX
+        self._default_parser: CommandParameterParser = CommandParameterParser()
 
     def add_detail(self, detail: str) -> Self:
         self._details.append(detail)
@@ -66,11 +67,13 @@ class CommandAttributes:
 
     @property
     def kwarg_prefix(self) -> str:
-        return self._kwarg_prefix
+        return self._default_parser.keyword_prefix
 
     @kwarg_prefix.setter
     def kwarg_prefix(self, value: str) -> None:
-        self._kwarg_prefix = value
+        self._default_parser = CommandParameterParser(
+            value, value, self._default_parser.parsers
+        )
 
     @property
     def details(self) -> list[str]:
@@ -85,6 +88,14 @@ class CommandAttributes:
         if self._has_invoked_callbacks and not value:
             raise ValueError("Cannot uninitialize.")
         self._has_invoked_callbacks = value
+
+    @property
+    def default_parser(self) -> CommandParameterParser:
+        return self._default_parser
+
+    @default_parser.setter
+    def default_parser(self, value: CommandParameterParser) -> None:
+        self._default_parser = value
 
 
 @dataclass(slots=True)
@@ -191,6 +202,14 @@ class Command(ABC):
         Command.__mutable_attributes__[self].kwarg_prefix = kwarg_prefix
         return self
 
+    @property
+    def default_parser(self) -> CommandParameterParser:
+        return Command.__mutable_attributes__[self].default_parser
+
+    def with_default_parser(self, parser: CommandParameterParser) -> Self:
+        Command.__mutable_attributes__[self].default_parser = parser
+        return self
+
     def add_detail(self, detail: str) -> Self:
         """
         Add details to this `Command`
@@ -222,9 +241,7 @@ class Command(ABC):
         elif isinstance(parsers, CommandParameterParser):
             parser = parsers
         else:
-            parser = CommandParameterParser(
-                self.kwarg_prefix, self.kwarg_prefix, parsers
-            )
+            parser = self.default_parser
         self.with_kwarg_prefix(parser.keyword_prefix)
 
         try:
@@ -252,9 +269,7 @@ class Command(ABC):
         elif isinstance(parsers, CommandParameterParser):
             parser = parsers
         else:
-            parser = CommandParameterParser(
-                self.kwarg_prefix, self.kwarg_prefix, parsers
-            )
+            parser = self.default_parser
         try:
             args, kwargs = parser.parse(self.parameters, entries)
             return await wrap_sync(self.function, *args, **kwargs)
@@ -359,6 +374,43 @@ class Command(ABC):
 
     def __str__(self) -> str:
         return self.details
+
+
+@dataclass(frozen=True, slots=True, weakref_slot=True)
+class InvalidCommandSentinel(Command):
+    __sentinel: ClassVar[InvalidCommandSentinel | None] = None
+
+    @classmethod
+    def create(
+        cls: type[Self],
+        function: Callable[..., Any],
+        name: str | None = None,
+        names: tuple[str, ...] | None = None,
+        help: str | None = None,
+        parameter_extractor: ParameterExtractor = default_parameter_extractor,
+        help_extractor: HelpExtractor = default_help_extractor,
+        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+    ) -> Self:
+        if not InvalidCommandSentinel.__sentinel:
+            InvalidCommandSentinel.__sentinel = InvalidCommandSentinel(
+                lambda: None, (), ("invalid",), None
+            )
+        return cast(Self, InvalidCommandSentinel.__sentinel)
+
+    @property
+    def is_async(self) -> bool:
+        return False
+
+
+INVALID_COMMAND: Command = InvalidCommandSentinel.create(
+    lambda: None, "", ("invalid",), None
+)
+
+
+def is_invalid_cmd(command: Command | None) -> bool:
+    if command is None:
+        return True
+    return isinstance(command, InvalidCommandSentinel) or command is INVALID_COMMAND
 
 
 def is_cmd(function: Callable[..., Any]) -> bool:

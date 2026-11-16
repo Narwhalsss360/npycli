@@ -27,7 +27,7 @@ from ..middleware import (
     wrap_sync,
 )
 from ..parsing import CommandParameterParser, Parsers
-from .command import Command
+from .command import INVALID_COMMAND, Command
 
 type ReturnValueHandler = Callable[[Command, Any], Any]
 
@@ -530,7 +530,7 @@ class CLI(ABC):
 
         @staticmethod
         def default_error_handler(
-            _: MiddlewareContext, command: Command, error: Exception
+            _: MiddlewareContext, command: Command | None, error: Exception
         ) -> Any:
             return CLI.RAISE
 
@@ -552,7 +552,9 @@ class CLI(ABC):
             if self.is_async:
 
                 async def async_wrapper(
-                    context: MiddlewareContext, command: Command, error: Exception
+                    context: MiddlewareContext,
+                    command: Command | None,
+                    error: Exception,
                 ) -> Any:
                     previous_result: ErrorMiddlewareHandler = await wrap_sync(
                         wrapped,
@@ -577,7 +579,9 @@ class CLI(ABC):
             else:
 
                 def sync_wrapper(
-                    context: MiddlewareContext, command: Command, error: Exception
+                    context: MiddlewareContext,
+                    command: Command | None,
+                    error: Exception,
                 ) -> Any:
                     previous_result: ErrorMiddlewareHandler = sync(
                         wrapped,
@@ -601,12 +605,12 @@ class CLI(ABC):
                 self._error_middleware_handler_info.handler = sync_wrapper
             return self
 
-        def sync_error(self, command: Command, error: Exception) -> Any:
+        def sync_error(self, command: Command | None, error: Exception) -> Any:
             return self._error_middleware_handler_info.handler(
                 self._error_middleware_handler_info.context, command, error
             )
 
-        async def async_error(self, command: Command, error: Exception) -> Any:
+        async def async_error(self, command: Command | None, error: Exception) -> Any:
             return await wrap_sync(
                 self._error_middleware_handler_info.handler,
                 self._error_middleware_handler_info.context,
@@ -867,14 +871,14 @@ class CLI(ABC):
             if self.is_async:
 
                 async def wrapper(
-                    _: MiddlewareContext, command: Command, error: Exception
+                    _: MiddlewareContext, command: Command | None, error: Exception
                 ) -> Any:
-                    return wrap_sync(function, command, error)
+                    return wrap_sync(function, INVALID_COMMAND, error)
 
                 self.middlewares.set_error_middleware(wrapper)
             else:
                 self.middlewares.set_error_middleware(
-                    lambda _, command, error: function(command, error)
+                    lambda _, command, error: function(INVALID_COMMAND, error)
                 )
             return function
 
@@ -897,6 +901,7 @@ class CLI(ABC):
         :return: Command function return value
         """
 
+        command: Command | None = None
         try:
             if not entries:
                 command_execution_info: CommandExecutionInfoMiddlewareResult = (
@@ -920,6 +925,9 @@ class CLI(ABC):
                 command, return_value
             )
         except CLIError as cli_error:
+            cli_error.cli = self
+            cli_error.command = command
+
             if (
                 return_value := self.middlewares.sync_error(command, cli_error)
             ) is CLI.RAISE:
@@ -929,7 +937,9 @@ class CLI(ABC):
                 return_value := self.middlewares.sync_error(command, error)
             ) is CLI.RAISE:
                 raise CLIError(
-                    f"An exception was raised running {command.name}: {error}",
+                    f"An exception was raised running {command.name}: {error}"
+                    if command
+                    else "An exception was raised attempting to execute a command.",
                     cli=self,
                     command=command,
                 ) from error
@@ -944,6 +954,7 @@ class CLI(ABC):
         """
 
         await self
+        command: Command | None = None
         try:
             if not entries:
                 command_execution_info: CommandExecutionInfoMiddlewareResult = (
@@ -967,16 +978,21 @@ class CLI(ABC):
                 command, return_value
             )
         except CLIError as cli_error:
+            cli_error.cli = self
+            cli_error.command = command
+
             if (
                 return_value := await self.middlewares.async_error(command, cli_error)
             ) is CLI.RAISE:
                 raise
         except Exception as error:
             if (
-                return_value := await self.middlewares.async_error(command, error)
+                return_value := self.middlewares.sync_error(command, error)
             ) is CLI.RAISE:
                 raise CLIError(
-                    f"An exception was raised running {command.name}: {error}",
+                    f"An exception was raised running {command.name}: {error}"
+                    if command
+                    else "An exception was raised attempting to execute a command.",
                     cli=self,
                     command=command,
                 ) from error
