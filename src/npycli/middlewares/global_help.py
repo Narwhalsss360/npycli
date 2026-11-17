@@ -11,13 +11,21 @@ from npycli.parameters import CommandParameter, ParameterKind
 from ..abc.cli import CLI
 from ..abc.command import Command
 
+GLOBAL_HELP_FLAG_BYPASS_CUSTOM_COMMAND_ATTRIBUTE: str = "global_help_flag_bypass"
+
+
+def bypass_global_help_flag(command: Command) -> Command:
+    return command.with_custom_attribute(
+        GLOBAL_HELP_FLAG_BYPASS_CUSTOM_COMMAND_ATTRIBUTE, True
+    )
+
 
 def create_global_help_flag_command_execution_info(
     help_command: str | Command = "help",
     global_help_flag: str = "help",
     help_command_max_positionals: int = 2,  # Assuming command name and parameter name
     allow_flag_obfuscation: bool = False,
-    bypass_for: tuple[Command, ...] = ()
+    bypass_for: tuple[Command, ...] = (),
 ) -> CommandExecutionInfoMiddlewareHandler:
     def command_execution_info(
         context: MiddlewareContext, entries: Sequence[str]
@@ -40,7 +48,10 @@ def create_global_help_flag_command_execution_info(
             if len(entries) == 0:
                 return CommandExecutionInfoMiddlewareResult(None, entries)
 
-            if len(entries) == 1 and entries[0] == f"{context.cli.kwarg_prefix}{global_help_flag}":
+            if (
+                len(entries) == 1
+                and entries[0] == f"{context.cli.kwarg_prefix}{global_help_flag}"
+            ):
                 return CommandExecutionInfoMiddlewareResult(help_command, ())
 
             command = context.cli.get_command(entries[0])
@@ -49,7 +60,9 @@ def create_global_help_flag_command_execution_info(
         if command is None:
             return CommandExecutionInfoMiddlewareResult(None, arg_entries)
 
-        if command in bypass_for:
+        if command in bypass_for or command.custom_attributes.get(
+            GLOBAL_HELP_FLAG_BYPASS_CUSTOM_COMMAND_ATTRIBUTE, False
+        ):
             return CommandExecutionInfoMiddlewareResult(command, arg_entries)
 
         if (
@@ -143,7 +156,7 @@ def use_global_help_flag(
     global_help_flag: str = "help",
     help_command_max_positionals: int = 2,  # Assuming command name and parameter name
     allow_flag_obfuscation: bool = False,
-    bypass_for: tuple[Command, ...] = ()
+    bypass_for: tuple[Command, ...] = (),
 ) -> CLI:
     cli.middlewares.wrap_command_execution_info_middleware(
         create_global_help_flag_command_execution_info(
@@ -151,7 +164,7 @@ def use_global_help_flag(
             global_help_flag,
             help_command_max_positionals,
             allow_flag_obfuscation,
-            bypass_for
+            bypass_for,
         )
     )
 
