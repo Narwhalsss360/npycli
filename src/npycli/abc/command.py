@@ -54,12 +54,13 @@ def default_help_extractor(
 
 
 class CommandAttributes:
-    __slots__ = ("_default_parser", "_details", "_has_invoked_callbacks")
+    __slots__ = ("_custom_attributes", "_default_parser", "_details", "_has_invoked_callbacks")
 
     def __init__(self) -> None:
         self._details: list[str] = []
         self._has_invoked_callbacks: bool = False
         self._default_parser: CommandParameterParser = CommandParameterParser()
+        self._custom_attributes: dict[str, Any] = {}
 
     def add_detail(self, detail: str) -> Self:
         self._details.append(detail)
@@ -96,6 +97,10 @@ class CommandAttributes:
     @default_parser.setter
     def default_parser(self, value: CommandParameterParser) -> None:
         self._default_parser = value
+
+    @property
+    def custom_attributes(self) -> dict[str, Any]:
+        return self._custom_attributes
 
 
 @dataclass(slots=True)
@@ -208,6 +213,14 @@ class Command(ABC):
 
     def with_default_parser(self, parser: CommandParameterParser) -> Self:
         Command.__mutable_attributes__[self].default_parser = parser
+        return self
+
+    @property
+    def custom_attributes(self) -> dict[str, Any]:
+        return Command.__mutable_attributes__[self].custom_attributes
+
+    def with_custom_attribute(self, key: str, value: Any) -> Self:
+        Command.__mutable_attributes__[self].custom_attributes[key] = value
         return self
 
     def add_detail(self, detail: str) -> Self:

@@ -90,7 +90,7 @@ class CustomAttribute:
         self.overwrite: bool = overwrite
 
     def __repr__(self) -> str:
-        return f"ParseHooks({self.key}, {self.value!r}, {self.overwrite})"
+        return f"CustomAttribute({self.key}, {self.value!r}, {self.overwrite})"
 
     def __str__(self) -> str:
         return repr(self)
