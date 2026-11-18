@@ -25,10 +25,16 @@ def create_global_help_flag_command_execution_info(
     help_command: str | Command = "help",
     global_help_flag: str = "help",
     global_help_flag_aliases: tuple[str, ...] = ("h",),
-    help_command_max_positionals: int = 2,  # Assuming command name and parameter name
+    help_command_max_positionals: int = 2,
     allow_flag_obfuscation: bool = False,
     bypass_for: tuple[Command, ...] = (),
 ) -> CommandExecutionInfoMiddlewareHandler:
+    """Create a command execution middleware handler which switched command execution if a global help flag is specified.
+    This will not occur if the command has the bypass_global_help_flag custom attribute or is specified in the corresponding argument.
+    help_command_max_positionals is used to limit how many positionals are proxied to the help command. By default, 2, assuming command name and parameter name.
+    If allow_flag_obfuscation is True, then if a command to be executed has the same flag name as the global_help_flag or it's aliases, then execution is still switched to the help command.
+    """
+
     def command_execution_info(
         context: MiddlewareContext, entries: Sequence[str]
     ) -> CommandExecutionInfoMiddlewareResult:
@@ -242,6 +248,8 @@ def use_global_help_flag[CLIType: CLI](
     allow_flag_obfuscation: bool = False,
     bypass_for: tuple[Command, ...] = (),
 ) -> CLIType:
+    """Use the global help flag middleware."""
+
     cli.middlewares.wrap_command_execution_info_middleware(
         create_global_help_flag_command_execution_info(
             help_command,

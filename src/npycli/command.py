@@ -9,6 +9,7 @@ from npycli.parsing import CommandParameterParser, Parsers
 
 from .abc import command as abccommand
 from .abc.command import (
+    INVALID_COMMAND,
     HelpExtractor,
     ParameterExtractor,
     cmd,
@@ -17,13 +18,14 @@ from .abc.command import (
     default_help_extractor,
     default_parameter_extractor,
     is_cmd,
-    INVALID_COMMAND,
     is_invalid_cmd,
 )
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
 class Command(abccommand.Command):
+    """The synchronous implementation of Command"""
+
     @classmethod
     @override
     def create(

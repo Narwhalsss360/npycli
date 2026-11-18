@@ -10,6 +10,8 @@ from .command import Command
 
 
 class CLI(abccli.CLI):
+    """The asynchrnous implementation of CLI"""
+
     @property
     @override
     def is_async(self) -> bool:

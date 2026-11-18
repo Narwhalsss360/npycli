@@ -22,6 +22,8 @@ type ParameterExtractor = Callable[[Callable[..., Any]], tuple[CommandParameter,
 def default_parameter_extractor(
     function: Callable[..., Any],
 ) -> tuple[CommandParameter, ...]:
+    """Default behavior for extracting parameters from a function signature."""
+
     annotations: dict[str, Any] = get_type_hints(function, include_extras=True)
     return tuple(
         CommandParameter.build(
@@ -46,6 +48,8 @@ def default_help_extractor(
     function: Callable[..., Any],
     parameters: tuple[CommandParameter, ...],
 ) -> str:
+    """Default behavior for extracting help string from a function signature, taking into account an existing help string."""
+
     if existing is not None:
         return existing
     if (doc := getdoc(function)) is not None:
@@ -122,6 +126,57 @@ class CommandFunctionBindings:
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
 class Command(ABC):
+    """The Command abstract-base class.
+    This immutable dataclass (with an immutable sub-properties, proxied through a WeakKeyDictionary).
+
+    This abstract base class has synchronous and asynchronous implementations.
+
+    Each command is represented by:
+    - function
+    - parameters
+    - names
+    - help
+
+    An asynchronous/synchronous Command may be discriminated by checking the is_async property.
+
+    A Command may be created by invoking the `Command.create(...)` abstract class method, whose creation behavior may be defined by the extractor parameters.
+
+    Commands have some somewhat mutable properties. They may not be set using the assignment operator, but methods are exposed to mutate certain properties.
+    This is done to keep the function, parameters, and names field consistent with each other, all defined together and immutable.
+
+    Immutable properties are:
+    - name
+    - aliases
+
+    Privately mutable properties are:
+    - has_invoked_callbacks: Essentialy, whether command hook callbacks were invoked in initialization, therefore, important to have been invoked _before_ any command execution.
+
+    Mutable (through methods) properties are:
+    - default_parser (mutable using Command.with_default_parser)
+    - custom_attributes (mutable using Command.custom_attributes)
+
+    The following method for parameters is exposed:
+    - find_parameter(parameter_name: str) -> CommandParameter | None, which finds a parameter of this by it's name
+
+    Execution methods:
+    - (a)sync_exec_with(entries: Sequence[str], parsers: Parsers | CommandParameterParser | None): These methods will execute the command (a)synchronously, which means, the entries are parsed, and the function is invoked.
+    If parsers is None, the default_parser is used.
+    If parsers is an instance of Parsers (dict[CommandParameterType, Callable[[str], Any]]), then a temporary instance of CommandParameterParser is created, a duplicate of default, but with specified CommandParameterType parsers.
+    If parsers is an instance of CommandParameterParser, then that instance is used.
+    If the synchronous implementation is invoked, synchronous function are invoked normally; asyncrhonous functions are invoked, but create coroutine object _only._
+    If the asynchronous implementation is invoked, synchronous function are invoked on a separate thread (using asyncio.to_thread), and asynchronous function are invoked and awaited.
+    The return value is the return value of the function
+
+    Method for describing the Command:
+    - basic_command_help: An equivalent to a function signature
+    - extended_command_help: Show detailed information about the command, it's attributes, and detailed information about each parameter.
+    - __str__: basic_command_help
+
+    Subclass implementation expectations:
+    The subclass is expected to implement and "extension" to __post_init__(), that is, the subclass invokes super(Self, self).__post_init__(), _then_ any extra post initialization code; some of that expected code is command hook callback invocation.
+    The subclass is expected to implement the methods exec_with() __call__(). This abstract-base class makes no contstraints.
+    """
+
     __mutable_attributes__: ClassVar[WeakKeyDictionary[Command, CommandAttributes]] = (
         WeakKeyDictionary()
     )
@@ -212,6 +267,7 @@ class Command(ABC):
                 self.default_parser.keyword_prefix,
                 self.default_parser.argument_separator,
                 parsers,
+                self.default_parser.char_keyword_prefix,
             )
 
         try:
@@ -243,6 +299,7 @@ class Command(ABC):
                 self.default_parser.keyword_prefix,
                 self.default_parser.argument_separator,
                 parsers,
+                self.default_parser.char_keyword_prefix,
             )
 
         try:
@@ -350,6 +407,8 @@ class Command(ABC):
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
 class InvalidCommandSentinel(Command):
+    """A type sentinel for creating invalid command sentinels, Mainly, for legacy use."""
+
     __sentinel: ClassVar[InvalidCommandSentinel | None] = None
 
     @classmethod
@@ -380,18 +439,24 @@ INVALID_COMMAND: Command = InvalidCommandSentinel.create(
 
 
 def is_invalid_cmd(command: Command | None) -> bool:
+    """Check whether the command is invalid (None or InvalidCommandSentinel)"""
+
     if command is None:
         return True
     return isinstance(command, InvalidCommandSentinel) or command is INVALID_COMMAND
 
 
 def is_cmd(function: Callable[..., Any]) -> bool:
+    """Check wether a Callable object has had any commands created from it."""
+
     if (binding := CommandFunctionBindings.get(function)) is None:
         return False
     return len(binding.commands) > 0
 
 
 def cmd(function: Callable[..., Any]) -> Command:
+    """Get the first Command create from this Callable object."""
+
     if (
         binding := CommandFunctionBindings.get(function)
     ) is None or not binding.commands:
@@ -404,12 +469,16 @@ def cmd(function: Callable[..., Any]) -> Command:
 
 
 def cmds(function: Callable[..., Any]) -> list[Command]:
+    """Get the all Commands create from this Callable object."""
+
     if (binding := CommandFunctionBindings.get(function)) is None:
         return []
     return [cmd for reference in binding.commands if (cmd := reference()) is not None]
 
 
 def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) -> bool:
+    """Hook into the initialization of a Command, invoked in dataclass post initialization."""
+
     if is_cmd(function):
         raise TypeError(
             f"function {function} is already not a future command, it is already a command: {cmd(function)}"

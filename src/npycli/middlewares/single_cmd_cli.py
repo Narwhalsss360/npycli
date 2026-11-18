@@ -15,6 +15,11 @@ def create_single_command_cli_command_execution_info(
     single_command: str | Command | None = None,
     strip_first_entry_if_is_name: bool = True,
 ) -> CommandExecutionInfoMiddlewareHandler:
+    """Create a command execution info middleware handler for CLIs which are meant to execute only a single command.
+    allow_multiple_commands is an option in the case that other middlewares add extra commands, which are meant to be executed in other ways, like, a wrapped command execution info.
+    In the case that multiple commands is True, and single_command is None, the defult_command is whichever is first in the list of commands of the CLI.
+    """
+
     def command_execution_info(
         context: MiddlewareContext, entries: Sequence[str]
     ) -> CommandExecutionInfoMiddlewareResult:
@@ -64,6 +69,8 @@ def use_single_command_cli[CLIType: CLI](
     single_command: str | Command | None = None,
     strip_first_entry_if_is_name: bool = True,
 ) -> CLIType:
+    """Use the single command cli middleware."""
+
     cli.middlewares.wrap_command_execution_info_middleware(
         create_single_command_cli_command_execution_info(
             allow_multiple_commands, single_command, strip_first_entry_if_is_name

@@ -47,6 +47,8 @@ def full_cli_error_string(
     ] = default_format_parsing_error,
     ansi: bool = True,
 ) -> str:
+    """Fully format a CLIError with all of it's CLIError/ParsingError causes. ANSI is optional. format_(cli|parsing)_error is the formatter for an error."""
+
     if ansi:
 
         def ansi_guard(sequence: ControlSequence) -> str:
@@ -93,6 +95,8 @@ def create_cli_error_printer(
     ] = default_cli_error_return_value,
     raise_on: tuple[type[Exception], ...] = (),
 ) -> ErrorMiddlewareHandler:
+    """Create the CLI Error printer error handler"""
+
     def cli_error_printer_error_handler(
         context: MiddlewareContext, command: npycli.abc.Command | None, error: Exception
     ) -> Any:
@@ -155,6 +159,8 @@ def use_cli_error_printer[CLIType: CLI](
     ] = default_cli_error_return_value,
     raise_on: tuple[type[Exception], ...] = (),
 ) -> CLIType:
+    """Use the cli error printer middleware."""
+
     cli.middlewares.wrap_error_middleware(
         create_cli_error_printer(
             file,

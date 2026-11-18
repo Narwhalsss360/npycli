@@ -38,6 +38,8 @@ def create_sub_cli_coalesce_command(
     annotation_preview: str = "",
     description: str = "",
 ) -> Command:
+    """Create a Command that proxies exection to another CLI."""
+
     max_annotation_preview_length: int = 80
 
     if not annotation_preview:

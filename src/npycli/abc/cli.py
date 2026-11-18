@@ -35,6 +35,10 @@ type ErrorHandler = Callable[[Command, Exception], Any]
 
 
 class RaiseExpectionSentinelType:
+    """A type that represents a sentinel type that an error middleware handler shall return to convey that an error is, in fact, unhandled
+    This creates an instance which is immutable/uncopyable to represent the sentinel, though, each singleton is indepedent of each other.
+    """
+
     __slots__ = ()
 
     def __repr__(self) -> str:
@@ -54,6 +58,42 @@ class RaiseExpectionSentinelType:
 
 
 class CLI(ABC):
+    """The CLI (Command-line Interface) abstract-base class.
+    This class has a list of commands which may be executed.
+
+    This abstract base class has synchronous and asynchronous implementations.
+
+    Title: The 'title' attribute is used from prompting
+    Parsing: The parser (CommandParameterParser) may be specified in the constructor. This is a mutable attribute of CLI.
+
+    An asynchronous/synchronous CLI may be discriminated by checking the is_async property.
+
+    The following defines how commands of this CLI are executed.
+    - Command switching is done by the command execution info middleware
+    - Command execution is done by the executor middleware
+    - (a)sync_exec exceptions may be handled by an error middleware. If the error middleware return the CLI.RAISE sentinel, the exceptions gets raised on the frame of the (a)sync_exec function.
+    - (a)sync_exec return value depends on the return value middleware
+
+    The cli may also prompt the user. This is defined by:
+    - the (a)sync_prompt function
+    - The prompt middleware
+    - The split middlware
+    - The return value of (a)sync_prompt is the return value of (a)sync_exec
+
+    Note: this abstract base class is awaitable, if not overriden, an exception is raised.
+
+    Middlewares: Middleware handlers may be set or wrapped.
+    - Setting handler: Setting a handler means that all previous handler, even if wrapped, get's overriden
+    - Wrapping handler: Wrap an existing handler, the previous result would be stored in the MiddlewareContext argument
+    - The 'middlewares' property returns a CLI.MiddlewareManager instance which may be used to register middlewares.
+
+    Legacy retvals and errors decorator_factories exist, they are registered as a middleware, wrapped to match signature
+
+    Subclass implementation expectations:
+    The subclass is expected to implement the methods exec() and __call__(), by convention. This abstract-base class sets no constraints.
+    Also, an __await__, if an asynchronous implementation.
+    """
+
     RAISE: RaiseExpectionSentinelType = RaiseExpectionSentinelType()
 
     class MiddlewareManager:
@@ -730,20 +770,29 @@ class CLI(ABC):
 
     @property
     def parser(self) -> CommandParameterParser:
+        """Get the parser of this CLI"""
+
         return self._parser
 
     @parser.setter
     def parser(self, value: CommandParameterParser) -> None:
+        """Set the parser. Also sets all command of CLI default_parser to this value."""
+
         self._parser = value
         for command in self._commands:
             command.with_default_parser(self._parser)
 
     @property
     @abstractmethod
-    def is_async(self) -> bool: ...
+    def is_async(self) -> bool:
+        """Whether this CLI has asynchronous implementations."""
+
+        ...
 
     @property
     def middlewares(self) -> MiddlewareManager:
+        """Get the middleware manager of this CLI."""
+
         return self._middleware_manager
 
     @property
@@ -766,6 +815,8 @@ class CLI(ABC):
 
     @property
     def has_invoked_callbacks(self) -> bool:
+        """Whether all commands of this CLI has invoked all callbacks (hooks)"""
+
         return all(command.has_invoked_callbacks for command in self._commands)
 
     def get_command(self, name: str) -> Command | None:
@@ -795,7 +846,9 @@ class CLI(ABC):
         name: str | None = None,
         names: tuple[str, ...] | None = None,
         help: str | None = None,
-    ) -> Callable[[F], F]: ...
+    ) -> Callable[[F], F]:
+        """Decorator factory that creates a command out of the function and add the command to this CLI."""
+        ...
 
     def retvals[F: ReturnValueHandler](
         self,
@@ -855,17 +908,21 @@ class CLI(ABC):
     def sync_command_execution_info(
         self, entries: Sequence[str]
     ) -> CommandExecutionInfoMiddlewareResult:
+        """Get the command execution info through registered middlewares."""
+
         return self.middlewares.sync_command_execution_info(entries)
 
     async def async_command_execution_info(
         self, entries: Sequence[str]
     ) -> CommandExecutionInfoMiddlewareResult:
+        """Get the command execution info through registered middlewares (asynchronously)."""
+
         return await self.middlewares.async_command_execution_info(entries)
 
     def sync_exec(self, entries: Sequence[str]) -> Any:
         """
-        Execute a command from specified `entries`.
-        :param entries: Command name and arguments.
+        Execute a command from specified `entries`, synchronously.
+        :param entries: Command name (default middleware behavior) and arguments.
         :return: Command function return value
         """
 
@@ -916,8 +973,8 @@ class CLI(ABC):
 
     async def async_exec(self, entries: Sequence[str]) -> Any:
         """
-        Execute a command from specified `entries`.
-        :param entries: Command name and arguments.
+        Execute a command from specified `entries`, asynchronously.
+        :param entries: Command name (default middleware behavior) and arguments.
         :return: Command function return value
         """
 
@@ -969,7 +1026,7 @@ class CLI(ABC):
 
     def sync_prompt(self) -> Any:
         """
-        Prompt the user for entries to `exec` on this CLI.
+        Prompt the user for entries to `exec` on this CLI, synchronously.
         :return: Command function return value
         """
 
@@ -981,7 +1038,7 @@ class CLI(ABC):
 
     async def async_prompt(self) -> Any:
         """
-        Prompt the user for entries to `exec` on this CLI.
+        Prompt the user for entries to `exec` on this CLI, asynchronously.
         :return: Command function return value
         """
 

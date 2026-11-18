@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class MiddlewareContext:
+    """The context passed to middleware handlers."""
+
     class DoesNotExistSentinelType:
+        """Does not exist sentinel type. Used to determine wether a base_result or previous_result exists."""
+
         __slots__ = ()
 
         def __repr__(self) -> str:
@@ -41,6 +45,8 @@ class MiddlewareContext:
 
 
 class MiddlewareHandler[**P, R](Protocol):
+    """Protocol that defines a generic MiddlewareHandler Callable"""
+
     def __call__(
         self, context: MiddlewareContext, /, *args: P.args, **kwargs: P.kwargs
     ) -> R: ...
@@ -91,6 +97,8 @@ type ReturnValueMiddlewareHandler = MiddlewareHandler[
 async def wrap_sync[**P, T](
     function: Callable[P, OptionallyAwaitable[T]], *args: P.args, **kwargs: P.kwargs
 ) -> T:
+    """Run the function specified and wait for it's result in an asynchronous frame. Executes synchronous functions on a separate thread, awaits coroutine functions."""
+
     if iscoroutinefunction(function):
         return await function(*args, **kwargs)
     return cast(T, await to_thread(function, *args, **kwargs))
@@ -99,12 +107,16 @@ async def wrap_sync[**P, T](
 def is_sync_function[**P, T](
     function: Callable[P, OptionallyAwaitable[T]],
 ) -> TypeGuard[Callable[P, T]]:
+    """Whether the function is not coroutine."""
+
     return not iscoroutinefunction(function)
 
 
 def sync[**P, T](
     function: Callable[P, OptionallyAwaitable[T]], *args: P.args, **kwargs: P.kwargs
 ) -> T:
+    """Run the function synchronously (no coroutines) in a synchronous frame."""
+
     assert is_sync_function(function)
     return function(*args, **kwargs)
 

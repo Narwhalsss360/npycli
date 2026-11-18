@@ -21,6 +21,8 @@ ParameterKind = _ParameterKind
 
 
 class Alias:
+    """Give an alias to a parameter in an Annotated[...] type annotation."""
+
     def __init__(self, *aliases: str, private: bool = False) -> None:
         self.aliases: tuple[str, ...] = aliases
         self.private: bool = private
@@ -33,6 +35,8 @@ class Alias:
 
 
 class Description:
+    """Give an description to a parameter in an Annotated[...] type annotation."""
+
     def __init__(self, description: str) -> None:
         self.description: str = description
 
@@ -44,6 +48,8 @@ class Description:
 
 
 class AnnotationPreview:
+    """Give an annotation preview to a parameter in an Annotated[...] type annotation."""
+
     def __init__(self, annotation_preview: str) -> None:
         self.annotation_preview: str = annotation_preview
 
@@ -55,6 +61,8 @@ class AnnotationPreview:
 
 
 class DefaultPreview:
+    """Give an default preview to a parameter in an Annotated[...] type annotation."""
+
     def __init__(self, default_preview: str) -> None:
         self.default_preview = default_preview
 
@@ -66,6 +74,8 @@ class DefaultPreview:
 
 
 class ParseHooks:
+    """Give parse hooks to a parameter in an Annotated[...] type annotation."""
+
     def __init__(
         self,
         pre: Callable[[str], str] | None = None,
@@ -84,6 +94,8 @@ class ParseHooks:
 
 
 class CustomAttribute:
+    """Give a custom attribute to a parameter in an Annotated[...] type annotation."""
+
     def __init__(self, key: str, value: Any, overwrite: bool = False) -> None:
         self.key: str = key
         self.value: Any = value
@@ -130,6 +142,41 @@ class CommandParameterAttributes:
 
 @dataclass(frozen=True)
 class CommandParameter:
+    """This immutable class represents a single parameter to a Command.
+
+    This immutable dataclass (with an immutable sub-properties, proxied through a WeakKeyDictionary).
+
+    The attributes of this class are:
+    - names: tuple[str, ...]; which are the names of the parameter
+    - kind: ParameterKind; which represents how the parameter may be supplied. (is _ParameterKind from std)
+    - annotation: Any; The annotation of the parameter
+    - annotation_preview: str = field(default=DEFAULT_STR); How the annotation previews for help
+    - argument_types: tuple[CommandParameterType, ...] = field(default=DEFAULT_ARG_TYPES); The types that this parameter may be parsed as
+    - default: Any = field(default_factory=lambda: CommandParameter.empty); The default value of the argument. If there's not default, then CommandParameter.empty, which is Parameter.empty
+    - default_preview: str = field(default=DEFAULT_STR); The preview of the default value for help
+    - description: str = field(default=DEFAULT_STR); The description of the parameter for help
+    - parse_hooks: ParseHooks | None = field(default=None); Parse hooks of the parameter
+    - container_annotation: Any | None = field(default=None); The container annotation of the parameter, used for parsing
+    - item_types: tuple[CommandParameterType, ...] | None = field(default=None); The item types of the container, if any container is a valid argument type for this parameter
+    - _private_name: str | None = field(default=None); the private name of the parameter, if an Alias(..., private=True), then the default name used when building is dropped, except for final parsed values.
+
+    the ClassVar UNPARSED is a sentinel object that represents a value that isn't parsed.
+
+    Custom attributes may be added with add_custom_attribute(key: str, value: Any, overwrite: bool = False).
+
+    Properties:
+    - argument_type; the first argument type this parameters argument may be
+    - container_type; the container type which this parameters argument may be.
+    - custom_attributes; dictionary of the custom attributes
+    - is_plain; whether this parameter's attribute indicate a parameter which has been instantiated _unbuilt,_ that is, invalid for use.
+    - name; the first name that of the parameter (never the _private_name)
+    - private_name; the name used for the parsed argument of this parameter
+
+    Methods:
+    - basic_parameter_help: The signature of this parameter
+    - extended_parameter_help: Detailed information about this parameter
+    """
+
     __mutable_attributes__: ClassVar[
         WeakKeyDictionary[CommandParameter, CommandParameterAttributes]
     ] = WeakKeyDictionary()
@@ -338,6 +385,16 @@ def container_annotation_item_types(
 
 
 class CommandParameterBuilder:
+    """The builder of CommandParameter from type annotations.
+    Every parameter must be built from a:
+    - name
+    - kind
+    - annotation,
+    - default
+
+    The parameter's attributes get generated in the __init__, and the parameter property allows you to access the built CommandParameter
+    """
+
     DEFAULT_STR: str = ""
     DEFAULT_NAMES: ClassVar[list[str]] = []
     DEFAULT_ARG_TYPES: ClassVar[list[CommandParameterType]] = [str]

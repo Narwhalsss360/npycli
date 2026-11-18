@@ -20,6 +20,8 @@ type Parsers = dict[CommandParameterType, Callable[[str], Any]]
 def create_literal_parser(
     literal_type: TypeAliasType | UnionType,
 ) -> Callable[[str], Any]:
+    """Create a parser which parses a string as either a one of str or int literals in the generic type alias of Literal"""
+
     if isinstance(literal_type, TypeAliasType):
         return create_literal_parser(literal_type.__value__)
 
@@ -44,6 +46,8 @@ def create_literal_parser(
 
 
 def create_enum_parser[T](enum_type: type[T]) -> Callable[[str], T]:
+    """Creates a parser which parses a string into an enum, by either value, and if fails, key."""
+
     assert issubclass(enum_type, Enum)
 
     def parser(s: str) -> T:
@@ -72,6 +76,8 @@ def parse_with_hooks(
     entry: str,
     parsers: Parsers,
 ) -> Any:
+    """Parse an entry to a CommandParameter argument using the specified parsers."""
+
     pre: Callable[[str], str] = default_pre_parse_hook
     post: Callable[[Any], Any] = default_post_parse_hook
     err: Callable[[str, Exception], Any | Exception] = default_err_parse_hook
@@ -161,6 +167,14 @@ def add_to_container_type(
 
 
 class CommandParameterParser:
+    """The class which parses entry tokens.
+    The keyword_prefix is the prefix for arguments supplied by name, by default, '--'. Ex. "--key value"
+    The argument_separator is the entry, which if exists, separates positional/keyword arguments and positional only arguments, by default, "--", Ex. "pos1 --key1 value1 -- --not-a-key positional-value"
+    The char_keyword_prefix is the single character prefix for single character keywords.
+
+    The parse method takes in a Sequence of CommandParameters, and it's return value are (args, kwargs) tuple.
+    """
+
     DEFAULT_KEYWORD_PREFIX: ClassVar[str] = "--"
     DEFAULT_CHAR_KEYWORD_PREFIX: ClassVar[str | None] = "-"
     DEFAULT_ARGUMENT_SEPARATOR: ClassVar[str] = DEFAULT_KEYWORD_PREFIX
@@ -567,6 +581,8 @@ def parse_parameters(
     char_keyword_prefix: str
     | None = CommandParameterParser.DEFAULT_CHAR_KEYWORD_PREFIX,
 ) -> tuple[list[Any], dict[str, Any]]:
+    """Parse parameters creating a temporary instance CommandParameterParser with the specified arguments."""
+
     return CommandParameterParser(
         keyword_prefix,
         argument_separator,

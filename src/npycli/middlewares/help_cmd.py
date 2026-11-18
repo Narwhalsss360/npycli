@@ -32,6 +32,10 @@ def create_help_command[CommandType: Command](
     long_form_default: bool = False,
     tab_string: str = "  ",
 ) -> CommandType:
+    """Generate a help command.
+    long_form_default, if True, shows the help string of command along with it's basic command help by default.
+    """
+
     command: CommandType
 
     def generate_help_for_help() -> str:
@@ -45,7 +49,7 @@ def create_help_command[CommandType: Command](
             "<...>: Positional or keyword parameter\n"
             "<*...>: Variable positional parameter (variable positional count)\n"
             "<**...>: Variable keyword (variable keyword-value count)\n"
-            "/: Positional-only / Positional delimiter (Parameters before may not be supplied by keyword-value)\n"
+            "/: Positional / Positional-only delimiter (Parameters before may not be supplied by keyword-value)\n"
             "<: ...>: Type\n"
             "<: = ...>: Default value\n"
             "[...]: Boolean flag (keyword only)\n"
@@ -190,7 +194,7 @@ def create_help_command[CommandType: Command](
         help=generate_help_for_help(),
         parameter_extractor=parameter_extractor,
         help_extractor=help_extractor,
-        parser=cli.parser,
+        parser=parser or cli.parser,
     )
 
     return command

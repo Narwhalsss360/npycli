@@ -26,6 +26,8 @@ from ..abc.command import (
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
 class Command(abccommand.Command):
+    """The asynchronous implementation of Command"""
+
     __async_initialization_tasks__: ClassVar[
         WeakKeyDictionary[Command, Task[Command] | None]
     ] = WeakKeyDictionary()
