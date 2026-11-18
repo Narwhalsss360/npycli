@@ -32,7 +32,7 @@ class Command(abccommand.Command):
         help: str | None = None,
         parameter_extractor: abccommand.ParameterExtractor = abccommand.default_parameter_extractor,
         help_extractor: abccommand.HelpExtractor = abccommand.default_help_extractor,
-        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+        parser: CommandParameterParser | None = None,
     ) -> Self:
         if names is None:
             if name:
@@ -46,7 +46,7 @@ class Command(abccommand.Command):
             parameters=parameters,
             names=names,
             help=help_extractor(help, function, parameters),
-        ).with_kwarg_prefix(kwarg_prefix)
+        ).with_default_parser(parser or CommandParameterParser())
 
     @property
     @override

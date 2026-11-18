@@ -714,29 +714,13 @@ class CLI(ABC):
         self,
         title: str | None = None,
         prompt_marker: str | None = None,
-        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
-        parsers: Parsers | None = None,
         parser: CommandParameterParser | None = None,
-        env: dict[Any, Any] | None = None,
         retval_handler: ReturnValueHandler | None = None,
         error_handler: ErrorHandler | None = None,
     ) -> None:
         self.title: str = title or "CLI"
         self.prompt_marker: str = prompt_marker or ">"
-
-        self._parser: CommandParameterParser
-        if parser is not None:
-            if any(x is not None for x in (kwarg_prefix, parsers)):
-                raise TypeError(
-                    "The arguments kwarg_prefix and parsers is both mutually exclusive with parser argument."
-                )
-            self._parser = parser
-        else:
-            self._parser: CommandParameterParser = CommandParameterParser(
-                kwarg_prefix, kwarg_prefix, parsers or {}
-            )
-
-        self.env: dict[Any, Any] = env or {}
+        self._parser: CommandParameterParser = parser or CommandParameterParser()
         self._commands: list[Command] = []
         self._middleware_manager: CLI.MiddlewareManager = CLI.MiddlewareManager(self)
         if retval_handler is not None:
@@ -753,28 +737,6 @@ class CLI(ABC):
         self._parser = value
         for command in self._commands:
             command.with_default_parser(self._parser)
-
-    @property
-    def parsers(self) -> Parsers:
-        return self._parser.parsers
-
-    @property
-    def kwarg_prefix(self) -> str:
-        return self._parser.keyword_prefix
-
-    @kwarg_prefix.setter
-    def kwarg_prefix(self, value: str) -> None:
-        self._parser.keyword_prefix = value
-        for command in self._commands:
-            command.with_default_parser(self._parser)
-
-    @property
-    def argument_separator(self) -> str:
-        return self._parser.argument_separator
-
-    @argument_separator.setter
-    def argument_separator(self, value: str) -> None:
-        self._parser.argument_separator = value
 
     @property
     @abstractmethod
@@ -978,7 +940,7 @@ class CLI(ABC):
                     )
 
             command, return_value = await self._middleware_manager.async_executor(
-                command, command_execution_info.arg_entries, self.parsers
+                command, command_execution_info.arg_entries, self._parser
             )
             return_value = await self._middleware_manager.async_return_value(
                 command, return_value

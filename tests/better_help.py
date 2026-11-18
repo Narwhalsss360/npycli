@@ -8,7 +8,7 @@ from npycli.parameters import Alias, CommandParameter, Description
 TAB_CHARS: str = " " * 4
 
 
-cli = CLI(title="user-items", prompt_marker="->", env={"user-items": {}})
+cli = CLI(title="user-items", prompt_marker="->")
 
 
 def __log_out__(text: str) -> None:
@@ -16,8 +16,11 @@ def __log_out__(text: str) -> None:
         log_file.write(text)
 
 
+__user_items__: dict[str, str] = {}
+
+
 def user_items() -> dict[str, str]:
-    return cli.env["user-items"]
+    return __user_items__
 
 
 @cli.cmd(name="add")
@@ -72,7 +75,9 @@ def show_help(
         for command in cli.commands:
             longest_name_length = max(longest_name_length, len(command.name))
             names.append(command.name)
-            descriptions.append(command.details or "")
+            descriptions.append(
+                "\n".join(f"{k}: {v}" for k, v in command.custom_attributes.items())
+            )
 
         name_fmt = f"<{longest_name_length + 2}"
 

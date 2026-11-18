@@ -9,12 +9,13 @@ import npycli
 from npycli.asyncio import CLI
 from npycli.errors import CLIError, EmptyEntriesError, MiddlewareError, ParsingError
 from npycli.middleware import (
-    CommandExecutionInfoMiddlewareHandler,
-    CommandExecutionInfoMiddlewareResult,
     MiddlewareContext,
 )
-from npycli.parameters import CommandParameter, ParameterKind
-from npycli.parsing import create_literal_parser, parse_parameters
+from npycli.middlewares.global_help import (
+    create_global_help_flag_command_execution_info,
+)
+from npycli.parameters import CommandParameter
+from npycli.parsing import create_literal_parser
 
 cli = CLI("async program")
 
@@ -24,7 +25,7 @@ class UserError(CLIError):
 
 
 type ErrorLevel = Literal["low", "high"]
-cli.parsers[ErrorLevel] = create_literal_parser(ErrorLevel)
+cli.parser.parsers[ErrorLevel] = create_literal_parser(ErrorLevel)
 
 
 @cli.cmd("do-async-operation")
@@ -136,124 +137,6 @@ def splitter(_: MiddlewareContext, user_input: str) -> Sequence[str]:
     return list(lexer)
 
 
-def create_global_help_command_execution_info_middleware(
-    global_help_flag_name: str = "help",
-    help_command_name: str = "help",
-    help_command_max_positionals: int = 2,
-) -> CommandExecutionInfoMiddlewareHandler:
-    """
-    Curry function that creates a command execution info middleware handler for switch execution to the help command in case of a gloval help flag
-    """
-
-    def global_help_command_execution_info(
-        context: MiddlewareContext, entries: Sequence[str]
-    ) -> CommandExecutionInfoMiddlewareResult:
-        if isinstance(context.previous_result, CommandExecutionInfoMiddlewareResult):
-            command: npycli.abc.command.Command | None = context.previous_result.command
-            arg_entries: Sequence[str] = context.previous_result.arg_entries
-        else:
-            if len(entries) == 0:
-                return CommandExecutionInfoMiddlewareResult(None, entries)
-
-            command: npycli.abc.command.Command | None = context.cli.get_command(
-                entries[0]
-            )
-            arg_entries: Sequence[str] = entries[1:]
-
-        if command is None:
-            return CommandExecutionInfoMiddlewareResult(command, arg_entries)
-
-        if (help_command := context.cli.get_command(help_command_name)) is None:
-            return CommandExecutionInfoMiddlewareResult(command, arg_entries)
-
-        if (
-            (
-                matching_parameter := next(
-                    filter(
-                        lambda p: global_help_flag_name in p.names, command.parameters
-                    ),
-                    None,
-                )
-            )
-            is not None
-            and len(matching_parameter.names) == 1
-            and matching_parameter.kind is ParameterKind.KEYWORD_ONLY
-        ):
-            raise MiddlewareError(
-                f"Invalid use of {global_help_command_execution_info}, global help flag obfuscates a target command parameter"
-            )
-
-        help_command_boolean_flags: tuple[CommandParameter, ...] = tuple(
-            parameter
-            for parameter in help_command.parameters
-            if bool in parameter.argument_types
-            and parameter.kind is ParameterKind.KEYWORD_ONLY
-        )
-        help_command_boolean_prefixed_flags_names: tuple[str, ...] = tuple(
-            f"{context.cli.kwarg_prefix}{name}"
-            for parameter in help_command.parameters
-            for name in parameter.names
-        )
-
-        global_help_parameter: CommandParameter = CommandParameter.build(
-            global_help_flag_name, ParameterKind.KEYWORD_ONLY, bool, False
-        )
-        _, kwargs = parse_parameters(
-            (
-                CommandParameter.build("_", ParameterKind.VAR_POSITIONAL, str | bool),
-                global_help_parameter,
-                *help_command_boolean_flags,
-                CommandParameter.build("_", ParameterKind.VAR_KEYWORD, str | bool),
-            ),
-            arg_entries,
-            context.cli.kwarg_prefix,
-            context.cli.kwarg_prefix,
-            {},
-        )
-
-        if not kwargs.get(global_help_flag_name, False):
-            return CommandExecutionInfoMiddlewareResult(command, arg_entries)
-        kwargs.pop(global_help_flag_name)
-
-        help_command_arg_entries: list[str] = [command.name]
-        no_keywords: bool = False
-        for entry in arg_entries:
-            if not no_keywords:
-                if entry == context.cli.kwarg_prefix:
-                    no_keywords = True
-                    continue
-                if entry.startswith(context.cli.kwarg_prefix):
-                    if entry in help_command_boolean_prefixed_flags_names:
-                        help_command_arg_entries.append(entry)
-                    continue
-
-            if len(help_command_arg_entries) == help_command_max_positionals:
-                continue
-            help_command_arg_entries.append(entry)
-
-        help_command_positional_count: int
-        if any(
-            parameter.kind is ParameterKind.VAR_POSITIONAL
-            for parameter in help_command.parameters
-        ):
-            help_command_positional_count = help_command_max_positionals
-        else:
-            help_command_positional_count = sum(
-                1
-                for parameter in help_command.parameters
-                if parameter.kind
-                in (ParameterKind.POSITIONAL_ONLY, ParameterKind.POSITIONAL_OR_KEYWORD)
-            )
-        help_command_positional_count = min(
-            help_command_positional_count, help_command_max_positionals
-        )
-        return CommandExecutionInfoMiddlewareResult(
-            help_command, help_command_arg_entries
-        )
-
-    return global_help_command_execution_info
-
-
 def format_cli_error(cli_error: CLIError) -> str:
     return f"{type(cli_error).__name__}{f' of {cli.title}' if cli_error.cli is not None else ''}{f', executing command {cli_error.command.name}' if cli_error.command is not None else ''}: {'\n'.join(cli_error.args)}"
 
@@ -264,7 +147,7 @@ def format_parsing_error(parsing_error: ParsingError) -> str:
 
 @cli.middlewares.register.error(wrapping=False)
 def error_handler(
-    context: MiddlewareContext, command: npycli.abc.Command, error: Exception
+    context: MiddlewareContext, command: npycli.abc.Command | None, error: Exception
 ) -> Any:
     """
     Handles CLIErrors, if not all causes were ParsingErrors or CLIError, then just raise the exception up the frame stack.
@@ -309,7 +192,7 @@ def return_value_handler(
 
 async def main() -> None:
     cli.middlewares.wrap_command_execution_info_middleware(
-        create_global_help_command_execution_info_middleware()
+        create_global_help_flag_command_execution_info()
     )
     while True:
         try:

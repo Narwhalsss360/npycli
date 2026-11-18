@@ -96,14 +96,14 @@ def create_sub_cli_coalesce_command(
                 "The preamble is to be used only when help is None to auto-generate help."
             )
 
-    command = CommandType.create(
+    command: Command = CommandType.create(
         async_coalesce if sub_cli.is_async else sync_coalesce,
         names=name_or_names,
         help=help,
         parameter_extractor=default_parameter_extractor,
         help_extractor=default_help_extractor,
-        kwarg_prefix=cli.kwarg_prefix,
-    ).with_default_parser(cli.parser)
+        parser=cli.parser,
+    )
     _set_sub_cli(command, sub_cli)
 
     from .global_help import bypass_global_help_flag

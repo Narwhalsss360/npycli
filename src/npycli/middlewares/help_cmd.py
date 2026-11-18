@@ -21,7 +21,7 @@ def create_help_command[CommandType: Command](
     name_or_names: str | tuple[str, ...] = "help",
     parameter_extractor: ParameterExtractor = default_parameter_extractor,
     help_extractor: HelpExtractor = default_help_extractor,
-    kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+    parser: CommandParameterParser | None = None,
     command_cls: type[CommandType] = sync_command.Command,
     line_prefix: str = "",
     commands_joiner: str = "\n",
@@ -49,12 +49,11 @@ def create_help_command[CommandType: Command](
             "<: ...>: Type\n"
             "<: = ...>: Default value\n"
             "[...]: Boolean flag (keyword only)\n"
-            f"Keyword prefix: '{cli.kwarg_prefix}'"
+            f"Keyword prefix: '{cli.parser.keyword_prefix}'"
             f"{char_prefix_line}"
         )
 
-    last_kwarg_prefix: str = kwarg_prefix
-    last_char_kwarg_prefix: str | None = cli.parser.char_keyword_prefix
+    last_parser: CommandParameterParser = cli.parser
 
     def description_command_help(command: Command) -> str:
         return f"{command.name}:\n{command.help or command.basic_command_help()}"
@@ -139,18 +138,13 @@ def create_help_command[CommandType: Command](
             ),
         ] = False,
     ) -> str:
-        nonlocal last_kwarg_prefix
-        nonlocal last_char_kwarg_prefix
+        nonlocal last_parser
         nonlocal command
 
         # In the case that CLI.kwarg_prefix gets set, it must be updated here for the help of the help function at least.
-        if (
-            last_kwarg_prefix != cli.kwarg_prefix
-            or last_char_kwarg_prefix != cli.parser.char_keyword_prefix
-        ):
+        if last_parser != cli.parser:
             object.__setattr__(command, "help", generate_help_for_help())
-            last_kwarg_prefix = cli.kwarg_prefix
-            last_char_kwarg_prefix = cli.parser.char_keyword_prefix
+            last_parser = cli.parser
 
         output: str
         if _command is None:
@@ -196,7 +190,7 @@ def create_help_command[CommandType: Command](
         help=generate_help_for_help(),
         parameter_extractor=parameter_extractor,
         help_extractor=help_extractor,
-        kwarg_prefix=kwarg_prefix,
+        parser=cli.parser,
     )
 
     return command
@@ -207,7 +201,7 @@ def use_help_command[CLIType: CLI, CommandType: Command](
     name_or_names: str | tuple[str, ...] = "help",
     parameter_extractor: ParameterExtractor = default_parameter_extractor,
     help_extractor: HelpExtractor = default_help_extractor,
-    kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+    parser: CommandParameterParser | None = None,
     command_cls: type[CommandType] = sync_command.Command,
     line_prefix: str = "",
     commands_joiner: str = "\n",
@@ -224,7 +218,7 @@ def use_help_command[CLIType: CLI, CommandType: Command](
             name_or_names=name_or_names,
             parameter_extractor=parameter_extractor,
             help_extractor=help_extractor,
-            kwarg_prefix=kwarg_prefix,
+            parser=parser,
             command_cls=command_cls,
             line_prefix=line_prefix,
             commands_joiner=commands_joiner,

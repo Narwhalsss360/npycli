@@ -54,31 +54,16 @@ def default_help_extractor(
 
 
 class CommandAttributes:
-    __slots__ = ("_custom_attributes", "_default_parser", "_details", "_has_invoked_callbacks")
+    __slots__ = (
+        "_custom_attributes",
+        "_default_parser",
+        "_has_invoked_callbacks",
+    )
 
     def __init__(self) -> None:
-        self._details: list[str] = []
         self._has_invoked_callbacks: bool = False
         self._default_parser: CommandParameterParser = CommandParameterParser()
         self._custom_attributes: dict[str, Any] = {}
-
-    def add_detail(self, detail: str) -> Self:
-        self._details.append(detail)
-        return self
-
-    @property
-    def kwarg_prefix(self) -> str:
-        return self._default_parser.keyword_prefix
-
-    @kwarg_prefix.setter
-    def kwarg_prefix(self, value: str) -> None:
-        self._default_parser = CommandParameterParser(
-            value, value, self._default_parser.parsers, self._default_parser.char_keyword_prefix
-        )
-
-    @property
-    def details(self) -> list[str]:
-        return self._details
 
     @property
     def has_invoked_callbacks(self) -> bool:
@@ -156,7 +141,7 @@ class Command(ABC):
         help: str | None = None,
         parameter_extractor: ParameterExtractor = default_parameter_extractor,
         help_extractor: HelpExtractor = default_help_extractor,
-        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+        parser: CommandParameterParser | None = None,
     ) -> Self:
         pass
 
@@ -183,29 +168,8 @@ class Command(ABC):
         return self.names[1:]
 
     @property
-    def details(self) -> str:
-        """
-        Details of this command, which include but are not limited to:
-        * Name
-        * Aliases
-        * Arguments
-        * Help string
-        :return: Details
-        """
-
-        return self.basic_command_help()
-
-    @property
     def has_invoked_callbacks(self) -> bool:
         return Command.__mutable_attributes__[self].has_invoked_callbacks
-
-    @property
-    def kwarg_prefix(self) -> str:
-        return Command.__mutable_attributes__[self].kwarg_prefix
-
-    def with_kwarg_prefix(self, kwarg_prefix: str) -> Self:
-        Command.__mutable_attributes__[self].kwarg_prefix = kwarg_prefix
-        return self
 
     @property
     def default_parser(self) -> CommandParameterParser:
@@ -221,16 +185,6 @@ class Command(ABC):
 
     def with_custom_attribute(self, key: str, value: Any) -> Self:
         Command.__mutable_attributes__[self].custom_attributes[key] = value
-        return self
-
-    def add_detail(self, detail: str) -> Self:
-        """
-        Add details to this `Command`
-        :param detail: Specific detail
-        :return: `None`
-        """
-
-        Command.__mutable_attributes__[self].add_detail(detail)
         return self
 
     def find_parameter(self, parameter_name: str) -> CommandParameter | None:
@@ -259,7 +213,6 @@ class Command(ABC):
                 self.default_parser.argument_separator,
                 parsers,
             )
-        self.with_kwarg_prefix(parser.keyword_prefix)
 
         try:
             args, kwargs = parser.parse(self.parameters, entries)
@@ -389,13 +342,10 @@ class Command(ABC):
         if self.help:
             out += f"\nDesciption: {self.help}"
 
-        for detail in Command.__mutable_attributes__[self].details:
-            out += f"\n->{detail}"
-
         return out
 
     def __str__(self) -> str:
-        return self.details
+        return self.basic_command_help()
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
@@ -411,7 +361,7 @@ class InvalidCommandSentinel(Command):
         help: str | None = None,
         parameter_extractor: ParameterExtractor = default_parameter_extractor,
         help_extractor: HelpExtractor = default_help_extractor,
-        kwarg_prefix: str = CommandParameterParser.DEFAULT_KEYWORD_PREFIX,
+        parser: CommandParameterParser | None = None,
     ) -> Self:
         if not InvalidCommandSentinel.__sentinel:
             InvalidCommandSentinel.__sentinel = InvalidCommandSentinel(

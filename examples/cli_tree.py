@@ -121,7 +121,7 @@ def construct_sub_cli_b() -> CLI:
         return ip
 
     try:
-        import apod_manager
+        import apod_manager  # type: ignore
 
         use_sub_cli_coalesce_command(cli_b, apod_manager.cli.cli, "apod")
     except ImportError:
