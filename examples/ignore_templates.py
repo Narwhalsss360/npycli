@@ -89,22 +89,23 @@ async def ignore_templates(
     )
 
 
-async def main() -> int:
-    help_command_name: str = "help"
-    use_global_help_flag(
+help_command_name: str = "help"
+use_global_help_flag(
+    cli,
+    create_help_command(
         cli,
-        create_help_command(
-            cli,
-            cmd(ignore_templates).help or "",
-            help_command_name,
-            print_to=stdout,
-            single_command_cli=cmd(ignore_templates),
-        ),
-    )
-    use_single_command_cli(
-        cli, allow_multiple_commands=True, single_command=cmd(ignore_templates)
-    )
+        cmd(ignore_templates).help or "",
+        help_command_name,
+        print_to=stdout,
+        single_command_cli=cmd(ignore_templates),
+    ),
+)
+use_single_command_cli(
+    cli, allow_multiple_commands=True, single_command=cmd(ignore_templates)
+)
 
+
+async def main() -> int:
     try:
         await cli.exec(argv[1:])
     except (CommandArgumentError, ClientError) as e:
