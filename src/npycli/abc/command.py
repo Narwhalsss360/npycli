@@ -73,7 +73,7 @@ class CommandAttributes:
     @kwarg_prefix.setter
     def kwarg_prefix(self, value: str) -> None:
         self._default_parser = CommandParameterParser(
-            value, value, self._default_parser.parsers
+            value, value, self._default_parser.parsers, self._default_parser.char_keyword_prefix
         )
 
     @property

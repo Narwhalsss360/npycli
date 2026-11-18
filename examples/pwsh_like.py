@@ -200,7 +200,7 @@ def main(
 if __name__ == "__main__":
     try:
         Command.create(main, "Walk-Tree").with_default_parser(
-            CommandParameterParser("-", "--")
+            CommandParameterParser("-", "--", char_keyword_prefix=None)
         ).exec_with(argv[1:])
     except KeyboardInterrupt:
         print("\n^C")
