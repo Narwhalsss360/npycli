@@ -256,3 +256,10 @@ def use_global_help_flag[CLIType: CLI](
     if isinstance(help_command, Command):
         cli.add_command(help_command)
     return cli
+
+
+__all__ = [
+    "bypass_global_help_flag",
+    "create_global_help_flag_command_execution_info",
+    "use_global_help_flag",
+]

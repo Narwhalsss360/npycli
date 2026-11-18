@@ -421,6 +421,7 @@ def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) 
 
 
 __all__ = [
+    "INVALID_COMMAND",
     "Command",
     "HelpExtractor",
     "ParameterExtractor",
@@ -430,4 +431,5 @@ __all__ = [
     "default_help_extractor",
     "default_parameter_extractor",
     "is_cmd",
+    "is_invalid_cmd",
 ]

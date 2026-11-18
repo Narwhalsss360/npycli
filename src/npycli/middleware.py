@@ -152,3 +152,25 @@ class ReturnValueMiddlewareHandlerInfo(
     HandlerInfo[["Command", Any], OptionallyAwaitable[Any]]
 ):
     pass
+
+
+__all__ = [
+    "CommandExecutionInfoHandlerInfo",
+    "CommandExecutionInfoMiddlewareHandler",
+    "CommandExecutionInfoMiddlewareResult",
+    "ErrorMiddlewareHandler",
+    "ErrorMiddlewareHandlerInfo",
+    "ExecutorMiddlewareHandler",
+    "ExecutorMiddlewareHandlerInfo",
+    "ExecutorMiddlewareResult",
+    "MiddlewareContext",
+    "PromptMiddlewareHandler",
+    "PromptMiddlewareHandlerInfo",
+    "ReturnValueMiddlewareHandler",
+    "ReturnValueMiddlewareHandlerInfo",
+    "SplitMiddlewareHandler",
+    "SplitMiddlewareHandlerInfo",
+    "is_sync_function",
+    "sync",
+    "wrap_sync",
+]

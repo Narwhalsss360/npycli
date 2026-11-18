@@ -1,4 +1,4 @@
-from . import abc, ansi, cli, command, errors, parameters, parsing
+from . import abc, ansi, cli, command, errors, middleware, parameters, parsing
 from . import ansi as ecma48
 from .cli import CLI
 from .command import Command
@@ -49,6 +49,7 @@ __all__ = [
     "command",
     "ecma48",
     "errors",
+    "middleware",
     "parameters",
     "parse_parameters",
     "parsing",

@@ -11,6 +11,7 @@ from npycli.parsing import CommandParameterParser, Parsers
 
 from ..abc import command as abccommand
 from ..abc.command import (
+    INVALID_COMMAND,
     HelpExtractor,
     ParameterExtractor,
     cmd,
@@ -19,6 +20,7 @@ from ..abc.command import (
     default_help_extractor,
     default_parameter_extractor,
     is_cmd,
+    is_invalid_cmd,
 )
 
 
@@ -105,6 +107,7 @@ def require_async_cmd(command: abccommand.Command) -> Command:
 
 
 __all__ = [
+    "INVALID_COMMAND",
     "Command",
     "HelpExtractor",
     "ParameterExtractor",
@@ -114,4 +117,5 @@ __all__ = [
     "default_help_extractor",
     "default_parameter_extractor",
     "is_cmd",
+    "is_invalid_cmd",
 ]

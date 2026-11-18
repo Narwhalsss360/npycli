@@ -17,6 +17,8 @@ from .abc.command import (
     default_help_extractor,
     default_parameter_extractor,
     is_cmd,
+    INVALID_COMMAND,
+    is_invalid_cmd,
 )
 
 
@@ -85,6 +87,7 @@ __all__ = ["Command", "cmd", "cmd_hook", "is_cmd"]
 
 
 __all__ = [
+    "INVALID_COMMAND",
     "Command",
     "HelpExtractor",
     "ParameterExtractor",
@@ -94,4 +97,5 @@ __all__ = [
     "default_help_extractor",
     "default_parameter_extractor",
     "is_cmd",
+    "is_invalid_cmd",
 ]

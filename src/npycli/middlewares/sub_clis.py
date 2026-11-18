@@ -127,3 +127,11 @@ def use_sub_cli_coalesce_command[CLIType: CLI](
         )
     )
     return cli
+
+
+__all__ = [
+    "create_sub_cli_coalesce_command",
+    "get_sub_cli",
+    "get_sub_clis",
+    "use_sub_cli_coalesce_command",
+]

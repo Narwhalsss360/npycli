@@ -231,3 +231,6 @@ def use_help_command[CLIType: CLI, CommandType: Command](
         )
     )
     return cli
+
+
+__all__ = ["create_help_command", "use_help_command"]

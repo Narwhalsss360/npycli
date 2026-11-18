@@ -48,3 +48,9 @@ def use_default_on_empty_command_execution_info[CLIType: CLI](
         create_default_on_empty_command_execution_info(default_command, default_args)
     )
     return cli
+
+
+__all__ = [
+    "create_default_on_empty_command_execution_info",
+    "use_default_on_empty_command_execution_info",
+]
