@@ -24,8 +24,8 @@ def create_default_on_empty_command_execution_info(
         ):
             return context.previous_result
 
-        if entries:
-            CLI.MiddlewareManager.sync_default_command_execution_info(context, entries)
+        if len(entries) != 0:
+            return CLI.MiddlewareManager.sync_default_command_execution_info(context, entries)
 
         if not isinstance(default_command, Command):
             if (command := context.cli.get_command(default_command)) is None:
