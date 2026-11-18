@@ -115,9 +115,7 @@ def as_prompter() -> None:
             return
         except EmptyEntriesError:  # If the user entered nothing, just continue
             pass
-        except (
-            CLIError
-        ) as err:  # Catch errors that occur between here and execution of command that are not handled by the error middleware
+        except CLIError as err:  # Catch errors that occur between here and execution of command that are not handled by the error middleware
             print(
                 full_cli_error_string(
                     cli,
@@ -140,9 +138,7 @@ def as_cli_program() -> None:
         cli.exec(argv[1:])
     except EmptyEntriesError:  # If the user entered nothing, just continue
         pass
-    except (
-        CLIError
-    ) as err:  # Catch errors that occur between here and execution of command that are not handled by the error middleware
+    except CLIError as err:  # Catch errors that occur between here and execution of command that are not handled by the error middleware
         print(
             full_cli_error_string(
                 cli,

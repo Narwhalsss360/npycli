@@ -20,7 +20,9 @@ from npycli.middlewares.sub_clis import get_sub_clis, use_sub_cli_coalesce_comma
 from npycli.parameters import Alias, BypassParse, Description
 
 
-def use_common_middlewares(cli: CLI, preamble: str = "", line_prefix: str = "") -> CLI:
+def use_common_middlewares[CLIType: CLI](
+    cli: CLIType, preamble: str = "", line_prefix: str = ""
+) -> CLIType:
     use_default_on_empty_command_execution_info(
         use_cli_error_printer(
             use_global_help_flag(

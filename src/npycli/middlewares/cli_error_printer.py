@@ -139,8 +139,8 @@ def create_cli_error_printer(
     return cli_error_printer_error_handler
 
 
-def use_cli_error_printer(
-    cli: CLI,
+def use_cli_error_printer[CLIType: CLI](
+    cli: CLIType,
     file: TextIO = stderr,
     error_prefix: str = "ERROR: ",
     cause_prefix: str = "CAUSE: ",
@@ -154,7 +154,7 @@ def use_cli_error_printer(
         [MiddlewareContext, Command | None, CLIError], Any
     ] = default_cli_error_return_value,
     raise_on: tuple[type[Exception], ...] = (),
-) -> CLI:
+) -> CLIType:
     cli.middlewares.wrap_error_middleware(
         create_cli_error_printer(
             file,

@@ -25,7 +25,9 @@ def create_default_on_empty_command_execution_info(
             return context.previous_result
 
         if len(entries) != 0:
-            return CLI.MiddlewareManager.sync_default_command_execution_info(context, entries)
+            return CLI.MiddlewareManager.sync_default_command_execution_info(
+                context, entries
+            )
 
         if not isinstance(default_command, Command):
             if (command := context.cli.get_command(default_command)) is None:
@@ -39,9 +41,9 @@ def create_default_on_empty_command_execution_info(
     return command_execution_info
 
 
-def use_default_on_empty_command_execution_info(
-    cli: CLI, default_command: str | Command, default_args: Sequence[str] = ()
-) -> CLI:
+def use_default_on_empty_command_execution_info[CLIType: CLI](
+    cli: CLIType, default_command: str | Command, default_args: Sequence[str] = ()
+) -> CLIType:
     cli.middlewares.wrap_command_execution_info_middleware(
         create_default_on_empty_command_execution_info(default_command, default_args)
     )

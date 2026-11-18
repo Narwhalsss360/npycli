@@ -233,15 +233,15 @@ def create_global_help_flag_command_execution_info(
     return command_execution_info
 
 
-def use_global_help_flag(
-    cli: CLI,
+def use_global_help_flag[CLIType: CLI](
+    cli: CLIType,
     help_command: str | Command = "help",
     global_help_flag: str = "help",
     global_help_flag_aliases: tuple[str, ...] = ("h",),
     help_command_max_positionals: int = 2,  # Assuming command name and parameter name
     allow_flag_obfuscation: bool = False,
     bypass_for: tuple[Command, ...] = (),
-) -> CLI:
+) -> CLIType:
     cli.middlewares.wrap_command_execution_info_middleware(
         create_global_help_flag_command_execution_info(
             help_command,

@@ -202,8 +202,8 @@ def create_help_command[CommandType: Command](
     return command
 
 
-def use_help_command[CommandType: Command](
-    cli: CLI,
+def use_help_command[CLIType: CLI, CommandType: Command](
+    cli: CLIType,
     name_or_names: str | tuple[str, ...] = "help",
     parameter_extractor: ParameterExtractor = default_parameter_extractor,
     help_extractor: HelpExtractor = default_help_extractor,
@@ -217,7 +217,7 @@ def use_help_command[CommandType: Command](
     single_command_cli: Command | None = None,
     long_form_default: bool = False,
     tab_string: str = "  ",
-) -> CLI:
+) -> CLIType:
     cli.add_command(
         create_help_command(
             cli,
