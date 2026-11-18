@@ -29,6 +29,8 @@ def create_help_command[CommandType: Command](
     print_end: str = "\n",
     print_flush: bool = False,
     single_command_cli: Command | None = None,
+    long_form_default: bool = False,
+    tab_string: str = "  ",
 ) -> CommandType:
     command: CommandType
 
@@ -71,10 +73,23 @@ def create_help_command[CommandType: Command](
                 description_parameter_help,
             )
         else:
-            command_help, parameter_help = (
-                Command.basic_command_help,
-                CommandParameter.basic_parameter_help,
-            )
+            if long_form_default:
+
+                def long_form_basic_command_help(command: Command) -> str:
+                    return f"{command.basic_command_help()}{f'\n{tab_string}{command.help.replace("\n", f"\n{tab_string}")}\n' if command.help else ''}"
+
+                def long_form_basic_parameter_help(parameter: CommandParameter) -> str:
+                    return f"{parameter.basic_parameter_help()}\n{description_parameter_help(parameter)}\n"
+
+                command_help, parameter_help = (
+                    long_form_basic_command_help,
+                    long_form_basic_parameter_help,
+                )
+            else:
+                command_help, parameter_help = (
+                    Command.basic_command_help,
+                    CommandParameter.basic_parameter_help,
+                )
 
         if parameter_name is None:
             return command_help(command)
@@ -186,6 +201,8 @@ def use_help_command[CommandType: Command](
     print_end: str = "\n",
     print_flush: bool = False,
     single_command_cli: Command | None = None,
+    long_form_default: bool = False,
+    tab_string: str = "  ",
 ) -> CLI:
     cli.add_command(
         create_help_command(
@@ -201,6 +218,8 @@ def use_help_command[CommandType: Command](
             print_end=print_end,
             print_flush=print_flush,
             single_command_cli=single_command_cli,
+            long_form_default=long_form_default,
+            tab_string=tab_string,
         )
     )
     return cli
