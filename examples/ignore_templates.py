@@ -3,8 +3,10 @@ from pathlib import Path
 from sys import argv, exit, stderr, stdout
 from typing import Annotated
 
+from npycli.abc.command import cmd
 from npycli.middlewares.global_help import use_global_help_flag
 from npycli.middlewares.help_cmd import create_help_command
+from npycli.middlewares.single_cmd_cli import use_single_command_cli
 
 try:
     from aiohttp import ClientError, ClientResponseError, ClientSession
@@ -21,6 +23,8 @@ from npycli.ansi.sequences import SGR
 from npycli.asyncio import CLI, Command, command
 from npycli.errors import CommandArgumentError
 from npycli.parameters import AnnotationPreview, Description
+
+cli = CLI(Path(__file__).with_suffix("").stem)
 
 
 def print_error(exc: Exception) -> None:
@@ -49,6 +53,7 @@ async def fetch_string(session: ClientSession, url: str) -> str:
         return await response.text()
 
 
+@cli.cmd("ignore")
 async def ignore_templates(
     *templates: Annotated[
         str,
@@ -85,27 +90,23 @@ async def ignore_templates(
 
 
 async def main() -> int:
-    cli = CLI(Path(__file__).name.replace(".py", ""))
-    cmd: Command = await Command.create(ignore_templates, cli.title)
-    cli.add_command(cmd)
     help_command_name: str = "help"
     use_global_help_flag(
         cli,
         create_help_command(
             cli,
-            cmd.help or "",
+            cmd(ignore_templates).help or "",
             help_command_name,
             print_to=stdout,
-            single_command_cli=cmd,
+            single_command_cli=cmd(ignore_templates),
         ),
     )
-
-    if len(argv) == 1:
-        await cli.exec((help_command_name,))
-        return 0
+    use_single_command_cli(
+        cli, allow_multiple_commands=True, single_command=cmd(ignore_templates)
+    )
 
     try:
-        await cli.exec((cmd.name, *argv[1:]))
+        await cli.exec(argv[1:])
     except (CommandArgumentError, ClientError) as e:
         print_error(e)
         return 1
