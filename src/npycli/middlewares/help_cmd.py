@@ -36,18 +36,25 @@ def create_help_command[CommandType: Command](
 
     def generate_help_for_help() -> str:
         nonlocal command
+        char_prefix_line = (
+            f"\nSingle character keyword prefix: '{cli.parser.char_keyword_prefix}'"
+            if cli.parser.char_keyword_prefix is not None
+            else ""
+        )
         return (
             "<...>: Positional or keyword parameter\n"
             "<*...>: Variable positional parameter (variable positional count)\n"
             "<**...>: Variable keyword (variable keyword-value count)\n"
-            "/: Positional / Positional only delimiter (Parameters before may not be supplied by keyword-value)\n"
+            "/: Positional-only / Positional delimiter (Parameters before may not be supplied by keyword-value)\n"
             "<: ...>: Type\n"
             "<: = ...>: Default value\n"
             "[...]: Boolean flag (keyword only)\n"
             f"Keyword prefix: '{cli.kwarg_prefix}'"
+            f"{char_prefix_line}"
         )
 
     last_kwarg_prefix: str = kwarg_prefix
+    last_char_kwarg_prefix: str | None = cli.parser.char_keyword_prefix
 
     def description_command_help(command: Command) -> str:
         return f"{command.name}:\n{command.help or command.basic_command_help()}"
@@ -119,24 +126,31 @@ def create_help_command[CommandType: Command](
         *,
         extended: Annotated[
             bool,
+            Alias("e"),
             Description(
                 "Show more information about the command(s) or specificed parameter than just signature."
             ),
         ] = False,
         description: Annotated[
             bool,
+            Alias("d"),
             Description(
                 "Show only the help description of the command. Overriden by 'extended' and ignored for a parameter."
             ),
         ] = False,
     ) -> str:
         nonlocal last_kwarg_prefix
+        nonlocal last_char_kwarg_prefix
         nonlocal command
 
         # In the case that CLI.kwarg_prefix gets set, it must be updated here for the help of the help function at least.
-        if last_kwarg_prefix != cli.kwarg_prefix:
+        if (
+            last_kwarg_prefix != cli.kwarg_prefix
+            or last_char_kwarg_prefix != cli.parser.char_keyword_prefix
+        ):
             object.__setattr__(command, "help", generate_help_for_help())
             last_kwarg_prefix = cli.kwarg_prefix
+            last_char_kwarg_prefix = cli.parser.char_keyword_prefix
 
         output: str
         if _command is None:
@@ -168,7 +182,7 @@ def create_help_command[CommandType: Command](
         if single_command_cli and preamble:
             output = f"{preamble}\n{output}"
 
-        output.replace("\n", f"{line_prefix}\n")
+        output = output.replace("\n", f"\n{line_prefix}")
         if print_to:
             print(output, end=print_end, file=print_to, flush=print_flush)
         return output

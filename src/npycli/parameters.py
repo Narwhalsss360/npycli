@@ -250,13 +250,13 @@ class CommandParameter:
             and self.kind
             in (ParameterKind.POSITIONAL_OR_KEYWORD, ParameterKind.KEYWORD_ONLY)
         ):
-            return f"[{self.name}]"
+            return f"[{', '.join((*((self.name,) if len(self.name) != 1 else ()), *(name for name in self.names if len(name) == 1)))}]"
         else:
             return (
                 "<"
                 f"{'*' if self.kind == ParameterKind.VAR_POSITIONAL else ''}"
                 f"{'**' if self.kind == ParameterKind.VAR_KEYWORD else ''}"
-                f"{self.name}: "
+                f"{', '.join((*((self.name,) if len(self.name) != 1 else ()), *(name for name in self.names if len(name) == 1)))}: "
                 f"{self.annotation_preview_fallback()}"
                 f"{'' if (default := self.default_preview_fallback()) is None else f' = {default}'}"
                 ">"

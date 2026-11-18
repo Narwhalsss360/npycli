@@ -1,7 +1,8 @@
 from sys import argv
+from typing import Annotated
 
 from npycli import Command
-from npycli.parameters import BypassParse
+from npycli.parameters import Alias, BypassParse
 
 
 def parse_bypass(*entries: BypassParse) -> None:
@@ -21,14 +22,21 @@ def parse_bypass_with_positionals(name: str, age: int, *entries: BypassParse) ->
 
 
 def parse_bypass_with_positionals_and_kwargs(
-    name: str, age: int, *entries: BypassParse, upper: bool = False, key: str = "value"
+    name: str,
+    age: int,
+    *entries: BypassParse,
+    upper: Annotated[bool, Alias("u")] = False,
+    strip: Annotated[bool, Alias("s")] = False,
+    key: Annotated[str, Alias("k")] = "value",
 ) -> None:
     """First give me some positionals, maybe some bool flags and some keyword arguments, but the rest, just (string) args."""
 
+    name = name.strip() if strip else name
     name = name.upper() if upper else name
     print(f"{name=}")
     print(f"{age=}")
     print(f"{upper=}")
+    print(f"{strip=}")
     print(f"{key=}")
     print("entries:")
     print("\n".join(entries))
@@ -38,17 +46,20 @@ def parse_bypass_with_positionals_and_kwargs_and_var_kwargs(
     name: str,
     age: int,
     *entries: BypassParse,
-    upper: bool = False,
-    key: str = "value",
+    upper: Annotated[bool, Alias("u")] = False,
+    strip: Annotated[bool, Alias("s")] = False,
+    key: Annotated[str, Alias("k")] = "value",
     **kwargs: str,
 ) -> None:
     """First give me some positionals, maybe some bool flags and some keyword arguments, and all the parsed keywords,
     but the rest (basically just positionals), just the (string) args."""
 
+    name = name.strip() if strip else name
     name = name.upper() if upper else name
     print(f"{name=}")
     print(f"{age=}")
     print(f"{upper=}")
+    print(f"{strip=}")
     print(f"{key=}")
     print("entries:")
     print("\n".join(entries))

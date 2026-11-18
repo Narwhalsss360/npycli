@@ -162,6 +162,7 @@ def add_to_container_type(
 
 class CommandParameterParser:
     DEFAULT_KEYWORD_PREFIX: ClassVar[str] = "--"
+    DEFAULT_CHAR_KEYWORD_PREFIX: ClassVar[str | None] = "-"
     DEFAULT_ARGUMENT_SEPARATOR: ClassVar[str] = DEFAULT_KEYWORD_PREFIX
 
     class Context:
@@ -187,46 +188,70 @@ class CommandParameterParser:
         keyword_prefix: str = DEFAULT_KEYWORD_PREFIX,
         argument_separator: str = DEFAULT_ARGUMENT_SEPARATOR,
         parsers: Parsers | None = None,
+        char_keyword_prefix: str | None = DEFAULT_CHAR_KEYWORD_PREFIX,
     ) -> None:
+        if not keyword_prefix:
+            raise ValueError("'keyword_prefix' must be a non-empty string")
+        if char_keyword_prefix is not None:
+            if len(char_keyword_prefix) != 1:
+                raise ValueError(
+                    "'char_keyword_prefix' must be a single character or None."
+                )
+            if char_keyword_prefix == keyword_prefix:
+                raise ValueError(
+                    "'char_keyword_prefix' cannot be identical to 'keyword_prefix'"
+                )
+
         self.keyword_prefix: str = keyword_prefix
+        self.char_keyword_prefix: str | None = char_keyword_prefix
         self.argument_separator: str = argument_separator
         self.parsers: Parsers = parsers or {}
 
-    def _next_keyword(
-        self,
-        context: CommandParameterParser.Context,
-        parameters: Sequence[CommandParameter],
-        bypass_parse: bool,
-        entries: Sequence[str],
-        i: int,
+    def _validate_no_pending_value(
+        self, context: CommandParameterParser.Context
     ) -> None:
-        entry: str = entries[i]
         if context.keyword_parameter is not None:
-            assert isinstance(context.keyword_parameter, CommandParameter)
             raise MissingKeywordArgumentValueError(
                 context.keyword_parameter.name,
                 f"'{context.keyword_parameter.name}' is missing a value",
             )
+
         if context.var_kwarg is not None:
             assert context.var_kwargs is not None, (
-                "'var_kwarg' may only be not None if 'var_kwargs' is not None"
+                "'var_kwarg' may one be None if 'var_kwargs' is not None"
             )
             if bool in context.var_kwargs.argument_types:
                 context.keyword_arguments[context.var_kwarg] = True
             else:
                 raise MissingKeywordArgumentValueError(
-                    f"'{context.var_kwarg}' is missing a value"
+                    context.var_kwarg, f"'{context.var_kwarg}' is missing a value."
                 )
 
-        keyword = entry[len(self.keyword_prefix) :]
+    def _apply_keyword(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: Sequence[CommandParameter],
+        keyword: str,
+        bypass_parse: bool,
+        entry: str,
+        is_last_entry: bool,
+        single_char: bool,
+    ) -> None:
         context.keyword_parameter = next(
-            filter(lambda p: keyword in p.names, parameters), None
+            filter(
+                lambda p: (
+                    keyword in p.names
+                    and ((len(keyword) == 1) if single_char else (len(keyword) > 1))
+                ),
+                parameters,
+            ),
+            None,
         )
-        if context.keyword_parameter is not None:  # type: ignore
-            context.keyword_parameter = context.keyword_parameter
+        if context.keyword_parameter is not None:
             if context.keyword_parameter.kind == ParameterKind.POSITIONAL_ONLY:
                 raise ParsingError(
-                    context.keyword_parameter.name, "This argument is positional only"
+                    context.keyword_parameter.name,
+                    f"The argument '{context.keyword_parameter.name}' is positional only",
                 )
             elif (
                 context.keyword_parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD
@@ -237,12 +262,14 @@ class CommandParameterParser:
                     f"'{context.keyword_parameter.name}' was already specified positionally",
                 )
 
-            if context.keyword_parameter.argument_types[0] is bool:  # Boolean flag
-                context.keyword_arguments[context.keyword_parameter.private_name] = True
+            if context.keyword_parameter.argument_types[0] is bool:
+                context.keyword_arguments[context.keyword_parameter.private_name] = (
+                    not context.keyword_parameter.default is True
+                )
                 context.keyword_parameter = None
         else:
             if context.var_kwargs is not None:
-                if bool in context.var_kwargs.argument_types and i == len(entries) - 1:
+                if bool in context.var_kwargs.argument_types and is_last_entry:
                     context.keyword_arguments[keyword] = True
                 else:
                     context.var_kwarg = keyword
@@ -250,6 +277,90 @@ class CommandParameterParser:
                 context.arguments.append(entry)
             else:
                 raise ParsingError(keyword, f"'{keyword}' is not a keyword parameter")
+
+    def _next_keyword(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: Sequence[CommandParameter],
+        bypass_parse: bool,
+        entries: Sequence[str],
+        i: int,
+    ) -> None:
+        self._validate_no_pending_value(context)
+        entry: str = entries[i]
+        keyword = entry[len(self.keyword_prefix) :]
+        is_last_entry: bool = i == len(entries) - 1
+        self._apply_keyword(
+            context, parameters, keyword, bypass_parse, entry, is_last_entry, False
+        )
+
+    def _next_char_keywords(
+        self,
+        context: CommandParameterParser.Context,
+        parameters: Sequence[CommandParameter],
+        bypass_parse: bool,
+        entries: Sequence[str],
+        i: int,
+    ) -> None:
+        assert self.char_keyword_prefix is not None
+        self._validate_no_pending_value(context)
+
+        entry: str = entries[i]
+        chars = entry[1:]
+        is_last_entry = i == len(entries) - 1
+
+        resolved_params: list[CommandParameter] = []
+        for character in chars:
+            parameter = next(
+                (
+                    parameter
+                    for parameter in parameters
+                    if character in parameter.names and len(character) == 1
+                ),
+                None,
+            )
+            if parameter is None:
+                if bypass_parse and context.var_kwargs is None:
+                    context.arguments.append(entry)
+                    return
+
+                if context.var_kwargs is not None:
+                    if len(chars) > 1:
+                        raise ParsingError(
+                            character,
+                            f"Cannot bundle unknown short option '{character}'",
+                        )
+                    if bool in context.var_kwargs.argument_types and is_last_entry:
+                        context.keyword_arguments[character] = True
+                    else:
+                        context.var_kwarg = character
+                    return
+                raise ParsingError(
+                    character, f"'{character}' is not a keyword parameter"
+                )
+            resolved_params.append(parameter)
+
+        for index, (character, parameter) in enumerate(zip(chars, resolved_params)):
+            is_last_char = index == len(chars) - 1
+            if parameter.kind == ParameterKind.POSITIONAL_ONLY:
+                raise ParsingError(parameter.name, "This argument is positional only")
+            if (
+                parameter.kind == ParameterKind.POSITIONAL_OR_KEYWORD
+                and parameters.index(parameter) < len(context.arguments)
+            ):
+                raise ParsingError(
+                    parameter.name,
+                    f"'{parameter.name}' was already specified positionally",
+                )
+
+            if parameter.argument_types[0] is bool:
+                context.keyword_arguments[parameter.private_name] = True
+            elif is_last_char:
+                context.keyword_parameter = parameter
+            else:
+                raise MissingKeywordArgumentValueError(
+                    parameter.name, f"'{parameter.name}' is missing a value"
+                )
 
     def _next_keyword_value(
         self,
@@ -377,6 +488,15 @@ class CommandParameterParser:
                 self._next_keyword(context, parameters, within_bypass, entries, i)
                 continue
 
+            if (
+                not context.no_keywords
+                and self.char_keyword_prefix is not None
+                and len(entry) > 1
+                and entry.startswith(self.char_keyword_prefix)
+            ):
+                self._next_char_keywords(context, parameters, within_bypass, entries, i)
+                continue
+
             if context.keyword_parameter is not None:
                 self._next_keyword_value(context, entries, i)
                 continue
@@ -444,10 +564,15 @@ def parse_parameters(
     keyword_prefix: str,
     argument_separator: str,
     parsers: Parsers,
+    char_keyword_prefix: str
+    | None = CommandParameterParser.DEFAULT_CHAR_KEYWORD_PREFIX,
 ) -> tuple[list[Any], dict[str, Any]]:
-    return CommandParameterParser(keyword_prefix, argument_separator, parsers).parse(
-        parameters, entries
-    )
+    return CommandParameterParser(
+        keyword_prefix,
+        argument_separator,
+        parsers,
+        char_keyword_prefix=char_keyword_prefix,
+    ).parse(parameters, entries)
 
 
 __all__ = [
