@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from enum import Enum
-from types import UnionType
+from types import NoneType, UnionType
 from typing import Any, ClassVar, Literal, TypeAliasType, get_args, get_origin
 
 from npycli.errors import MissingKeywordArgumentValueError, ParsingError
@@ -88,6 +88,7 @@ def parse_with_hooks(
 
     parsed: Any = CommandParameter.UNPARSED
     entry = pre(entry)
+    last_exception: Exception | None = None
     for ith_type, parameter_type in enumerate(parameter.argument_types):
         if (
             parameter_type in CONTAINER_TYPES
@@ -100,6 +101,8 @@ def parse_with_hooks(
         for ith_inner_type, inner_type in enumerate(inner_types):
             if isinstance(inner_type, type):
                 parser: Callable[..., Any] = parsers.get(inner_type, inner_type)
+                if parser is NoneType:
+                    continue
             elif inner_type in parsers:
                 parser: Callable[..., Any] = parsers[inner_type]
             else:
@@ -109,6 +112,7 @@ def parse_with_hooks(
                 parsed = parser(entry)
                 break
             except (ParsingError, TypeError, ValueError, RuntimeError) as exc:
+                last_exception = exc
                 if not isinstance(handled := err(entry, exc), Exception):
                     parsed = handled
                     break
@@ -142,7 +146,9 @@ def parse_with_hooks(
 
     if parsed is CommandParameter.UNPARSED:
         raise ParsingError(
-            entry, f"Parse resolution exhausted: {entry} as {parameter.argument_types}"
+            entry,
+            f"Parse resolution exhausted: {entry} as {parameter.argument_types}.{f' Last error: {type(last_exception).__name__}: {last_exception.args}' if last_exception is not None else ''}",
+            last_exception=last_exception
         )
 
     return post(parsed)

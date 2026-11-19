@@ -11,8 +11,11 @@ if TYPE_CHECKING:
 class ParsingError(Exception):
     """Whether an error occurred during CommandParameter parsing."""
 
-    def __init__(self, what: str, *args: Any) -> None:
+    def __init__(
+        self, what: str, *args: Any, last_exception: Exception | None = None
+    ) -> None:
         self.what: str = what
+        self.last_exception: Exception | None = last_exception
         super().__init__(*args)
 
 
