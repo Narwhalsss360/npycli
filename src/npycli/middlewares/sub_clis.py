@@ -49,6 +49,11 @@ def get_sub_clis(cli: CLI) -> list[CLI]:
     ]
 
 
+class UseSubCLIHelpCommand:
+    def __init__(self, command_name: str = "help") -> None:
+        self.command_name: str = command_name
+
+
 def create_sub_cli_coalesce_command(
     cli: CLI,
     sub_cli: CLI,
@@ -143,9 +148,7 @@ def create_sub_cli_coalesce_command(
 
     CommandType = asynccommand.Command if sub_cli.is_async else synccommand.Command
 
-    if help is None:
-        from .help_cmd import create_help_command
-
+    if isinstance(help, UseSubCLIHelpCommand):
         if (
             (help_command := sub_cli.get_command("help")) is not None
             and not iscoroutinefunction(help_command.function)
@@ -157,7 +160,15 @@ def create_sub_cli_coalesce_command(
         ):
             help = str(inner_help_result)
         else:
-            help = create_help_command(sub_cli, preamble=preamble or "").function()
+            raise MiddlewareError(
+                f"The help function {help.command_name} is not invokable.",
+                cli=cli,
+                command=help_command,
+            )
+    elif help is None:
+        from .help_cmd import create_help_command
+
+        help = str(create_help_command(sub_cli, preamble=preamble or "").function())
     else:
         if preamble is not None:
             raise MiddlewareError(
@@ -184,7 +195,7 @@ def use_sub_cli_coalesce_command[CLIType: CLI](
     cli: CLIType,
     sub_cli: CLI,
     name_or_names: str | tuple[str, ...] = (),
-    help: str | None = None,
+    help: str | UseSubCLIHelpCommand | None = None,
     preamble: str | None = None,
     annotation_preview: str = "",
     description: str = "",
