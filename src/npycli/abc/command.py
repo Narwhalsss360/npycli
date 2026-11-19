@@ -94,7 +94,9 @@ class CommandAttributes:
 
 @dataclass(slots=True)
 class CommandFunctionBindings:
-    __BINDINGS_ATTR__: ClassVar[str] = "__cmd__"
+    __BINDINGS__: ClassVar[
+        WeakKeyDictionary[Callable[..., Any], CommandFunctionBindings]
+    ] = WeakKeyDictionary()
 
     commands: list[ReferenceType[Command]] = field(
         default_factory=list[ReferenceType["Command"]]
@@ -109,19 +111,10 @@ class CommandFunctionBindings:
         return self
 
     @staticmethod
-    def get(function: Callable[..., Any]) -> CommandFunctionBindings | None:
-        if not hasattr(function, CommandFunctionBindings.__BINDINGS_ATTR__):
-            object.__setattr__(
-                function,
-                CommandFunctionBindings.__BINDINGS_ATTR__,
-                CommandFunctionBindings(),
-            )
-            if not hasattr(function, CommandFunctionBindings.__BINDINGS_ATTR__):
-                return None
-
-        bindings = getattr(function, CommandFunctionBindings.__BINDINGS_ATTR__)
-        assert isinstance(bindings, CommandFunctionBindings)
-        return bindings.updated()
+    def get(function: Callable[..., Any]) -> CommandFunctionBindings:
+        if function not in CommandFunctionBindings.__BINDINGS__:
+            CommandFunctionBindings.__BINDINGS__[function] = CommandFunctionBindings()
+        return CommandFunctionBindings.__BINDINGS__[function].updated()
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)
@@ -338,21 +331,20 @@ class Command(ABC):
             raise TypeError(f"{Command} help must be a {str}.")
 
     def _attach_self(self) -> None:
-        if (binding := CommandFunctionBindings.get(self.function)) is None:
-            return
-        binding.commands.append(ref(self))
+        CommandFunctionBindings.get(self.function).commands.append(ref(self))
 
     def _sync_callback_futures(self) -> None:
-        if (binding := CommandFunctionBindings.get(self.function)) is None:
-            return
-        for callback in binding.hooks:
+        for callback in CommandFunctionBindings.get(self.function).hooks:
             callback(self)
         Command.__mutable_attributes__[self].has_invoked_callbacks = True
 
     async def _async_callback_futures(self) -> None:
-        if (binding := CommandFunctionBindings.get(self.function)) is None:
-            return
-        await gather(*(wrap_sync(callback, self) for callback in binding.hooks))
+        await gather(
+            *(
+                wrap_sync(callback, self)
+                for callback in CommandFunctionBindings.get(self.function).hooks
+            )
+        )
         Command.__mutable_attributes__[self].has_invoked_callbacks = True
 
     def __post_init__(self) -> None:
@@ -449,19 +441,15 @@ def is_invalid_cmd(command: Command | None) -> bool:
 def is_cmd(function: Callable[..., Any]) -> bool:
     """Check wether a Callable object has had any commands created from it."""
 
-    if (binding := CommandFunctionBindings.get(function)) is None:
-        return False
-    return len(binding.commands) > 0
+    return len(CommandFunctionBindings.get(function).commands) > 0
 
 
 def cmd(function: Callable[..., Any]) -> Command:
     """Get the first Command create from this Callable object."""
 
-    if (
-        binding := CommandFunctionBindings.get(function)
-    ) is None or not binding.commands:
+    if not is_cmd(function):
         raise ValueError(f"{function} is not a command. Use {is_cmd}.")
-    command = binding.commands[-1]()
+    command: Command | None = CommandFunctionBindings.get(function).commands[-1]()
     assert command is not None, (
         "CommandFunctionBindings.get(...) should ensure all references are valid"
     )
@@ -471,21 +459,26 @@ def cmd(function: Callable[..., Any]) -> Command:
 def cmds(function: Callable[..., Any]) -> list[Command]:
     """Get the all Commands create from this Callable object."""
 
-    if (binding := CommandFunctionBindings.get(function)) is None:
-        return []
-    return [cmd for reference in binding.commands if (cmd := reference()) is not None]
+    return [
+        cmd
+        for reference in CommandFunctionBindings.get(function).commands
+        if (cmd := reference()) is not None
+    ]
 
 
-def cmd_hook(function: Callable[..., Any], callback: Callable[[Command], None]) -> bool:
+def cmd_hook(
+    function: Callable[..., Any],
+    callback: Callable[[Command], None],
+    apply_to_existing: bool = True,
+) -> bool:
     """Hook into the initialization of a Command, invoked in dataclass post initialization."""
-
-    if is_cmd(function):
-        raise TypeError(
-            f"function {function} is already not a future command, it is already a command: {cmd(function)}"
-        )
-    if (binding := CommandFunctionBindings.get(function)) is None:
-        return False
-    binding.hooks.append(callback)
+    bindings: CommandFunctionBindings = CommandFunctionBindings.get(function)
+    if apply_to_existing:
+        for command_ref in bindings.commands:
+            if (command := command_ref()) is None:
+                continue
+            callback(command)
+    bindings.hooks.append(callback)
     return True
 
 
