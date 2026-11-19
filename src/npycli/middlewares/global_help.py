@@ -66,6 +66,14 @@ def create_global_help_flag_command_execution_info(
         if isinstance(context.previous_result, CommandExecutionInfoMiddlewareResult):
             command = context.previous_result.command
             arg_entries = context.previous_result.arg_entries
+            if command is None:
+                if len(entries) == 0:
+                    return CommandExecutionInfoMiddlewareResult(None, entries)
+
+                if len(entries) == 1 and entries[0] in prefixed_names(
+                    all_global_help_names
+                ):
+                    return CommandExecutionInfoMiddlewareResult(help_command, ())
         else:
             if len(entries) == 0:
                 return CommandExecutionInfoMiddlewareResult(None, entries)
