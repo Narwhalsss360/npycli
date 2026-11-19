@@ -19,7 +19,7 @@ from npycli.middleware import ErrorMiddlewareHandler, MiddlewareContext
 
 
 def default_format_cli_error(cli: CLI, cli_error: CLIError, ansi: bool) -> str:
-    return f"{type(cli_error).__name__}{f' of {cli.title}' if cli_error.cli is not None else ''}{f', executing command {cli_error.command.name}' if cli_error.command is not None else ''}: {'\n'.join(cli_error.args)}"
+    return f"{type(cli_error).__name__} of {cli_error.cli.title if cli_error.cli is not None else cli.title}{f', executing command {cli_error.command.name}' if cli_error.command is not None else ''}: {'\n'.join(cli_error.args)}"
 
 
 def default_format_parsing_error(

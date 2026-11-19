@@ -39,6 +39,16 @@ def use_common_middlewares[CLIType: CLI](
     return cli
 
 
+def use_sub_cli_middlewares[CLIType: CLI](cli: CLIType) -> CLIType:
+    @cli.middlewares.register.error()
+    def always_raise(
+        context: MiddlewareContext, command: npycli.abc.Command | None, error: Exception
+    ) -> Any:
+        return CLI.RAISE
+
+    return cli
+
+
 def construct_sub_cli_a() -> CLI:
     cli_a: CLI = CLI("fileio")
 
@@ -123,7 +133,9 @@ def construct_sub_cli_b() -> CLI:
     try:
         import apod_manager  # type: ignore
 
-        use_sub_cli_coalesce_command(cli_b, apod_manager.cli.cli, "apod")
+        use_sub_cli_coalesce_command(
+            cli_b, use_sub_cli_middlewares(apod_manager.cli.cli), "apod"
+        )
     except ImportError:
 
         @cli_b.cmd()
@@ -153,7 +165,9 @@ def construct_sub_cli_b() -> CLI:
 
     import ignore_templates_requests
 
-    use_sub_cli_coalesce_command(cli_b, ignore_templates_requests.cli, "ignore")
+    use_sub_cli_coalesce_command(
+        cli_b, use_sub_cli_middlewares(ignore_templates_requests.cli), "ignore"
+    )
 
     # ignore_templates_requests prints to stdout, so that things don't get shown twice, make all return values None
     @ignore_templates_requests.cli.middlewares.register.return_value()
@@ -162,7 +176,7 @@ def construct_sub_cli_b() -> CLI:
     ) -> Any:
         return None
 
-    return use_common_middlewares(cli_b, "Sub CLI B")
+    return use_sub_cli_middlewares(use_common_middlewares(cli_b, "Sub CLI B"))
 
 
 def main(*args: BypassParse, prompter: bool = False) -> int:
@@ -231,6 +245,7 @@ def main(*args: BypassParse, prompter: bool = False) -> int:
                 )
             )
             code = 1
+            break
 
         if not prompter:
             break

@@ -95,6 +95,7 @@ class CLI(ABC):
     """
 
     RAISE: RaiseExpectionSentinelType = RaiseExpectionSentinelType()
+    REPLACE: RaiseExpectionSentinelType = RaiseExpectionSentinelType()
 
     class MiddlewareManager:
         class Register:
@@ -943,6 +944,7 @@ class CLI(ABC):
                         f"Command {entries[0]} does not exist.", cli=self
                     )
 
+            return_value: Any
             command, return_value = self._middleware_manager.sync_executor(
                 command, command_execution_info.arg_entries, self._parser
             )
@@ -950,17 +952,28 @@ class CLI(ABC):
                 command, return_value
             )
         except CLIError as cli_error:
-            cli_error.cli = self
-            cli_error.command = command
+            has_no_info: bool = cli_error.cli is None and cli_error.command is None
+            was_self: bool = cli_error.cli is self
+            if cli_error.cli is None:
+                cli_error.cli = self
+            if cli_error.command is None:
+                cli_error.command = command
+            return_value = self.middlewares.sync_error(command, cli_error)
 
-            if (
-                return_value := self.middlewares.sync_error(command, cli_error)
-            ) is CLI.RAISE:
+            if return_value is CLI.RAISE:
+                if has_no_info or was_self:
+                    raise
+                else:
+                    raise CLIError(
+                        *cli_error.args, cli=self, command=command
+                    ) from cli_error
+            elif return_value is CLI.REPLACE:
+                cli_error.cli = self
+                cli_error.command = command
                 raise
         except Exception as error:
-            if (
-                return_value := self.middlewares.sync_error(command, error)
-            ) is CLI.RAISE:
+            return_value = self.middlewares.sync_error(command, error)
+            if return_value in (CLI.RAISE, CLI.REPLACE):
                 raise CLIError(
                     f"An exception was raised running {command.name}: {error}"
                     if command
@@ -996,6 +1009,7 @@ class CLI(ABC):
                         f"Command {entries[0]} does not exist.", cli=self
                     )
 
+            return_value: Any
             command, return_value = await self._middleware_manager.async_executor(
                 command, command_execution_info.arg_entries, self._parser
             )
@@ -1003,17 +1017,28 @@ class CLI(ABC):
                 command, return_value
             )
         except CLIError as cli_error:
-            cli_error.cli = self
-            cli_error.command = command
+            has_no_info: bool = cli_error.cli is None and cli_error.command is None
+            was_self: bool = cli_error.cli is self
+            if cli_error.cli is None:
+                cli_error.cli = self
+            if cli_error.command is None:
+                cli_error.command = command
+            return_value = await self.middlewares.async_error(command, cli_error)
 
-            if (
-                return_value := await self.middlewares.async_error(command, cli_error)
-            ) is CLI.RAISE:
+            if return_value is CLI.RAISE:
+                if has_no_info or was_self:
+                    raise
+                else:
+                    raise CLIError(
+                        *cli_error.args, cli=self, command=command
+                    ) from cli_error
+            elif return_value is CLI.REPLACE:
+                cli_error.cli = self
+                cli_error.command = command
                 raise
         except Exception as error:
-            if (
-                return_value := self.middlewares.sync_error(command, error)
-            ) is CLI.RAISE:
+            return_value = await self.middlewares.async_error(command, error)
+            if return_value in (CLI.RAISE, CLI.REPLACE):
                 raise CLIError(
                     f"An exception was raised running {command.name}: {error}"
                     if command
