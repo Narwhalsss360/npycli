@@ -58,11 +58,12 @@ def create_sub_cli_coalesce_command(
     cli: CLI,
     sub_cli: CLI,
     name_or_names: str | tuple[str, ...] = (),
-    help: str | None = None,
+    help: str | UseSubCLIHelpCommand | None = None,
     preamble: str | None = None,
     annotation_preview: str = "",
     description: str = "",
     coalesce_cli_error_args: bool = False,
+    qualified_name_primary: bool = True,
 ) -> Command:
     """Create a Command that proxies exection to another CLI."""
 
@@ -87,7 +88,14 @@ def create_sub_cli_coalesce_command(
         name_or_names if isinstance(name_or_names, tuple) else (name_or_names,)
     ) or (sub_cli.title,)
 
-    def fill_cli_error_for_sub_cli(args: tuple[str, ...], cli_error: CLIError) -> None:
+    if qualified_name_primary:
+        name_or_names = (f"::{name_or_names[0]}", *name_or_names)
+    else:
+        name_or_names = (*name_or_names, f"::{name_or_names[0]}")
+
+    def fill_cli_error_for_cli_frame(
+        args: tuple[str, ...], cli_error: CLIError
+    ) -> CLIError:
         base_cli_error: CLIError = cast(
             CLIError,
             next(
@@ -97,11 +105,12 @@ def create_sub_cli_coalesce_command(
                 )
             ),
         )
-        cli_error.cli = cli_error.cli or sub_cli
+        cli_error.cli = cli
         cli_error.args = (
             f"Invoking sub-cli {sub_cli.title}, the following error occured{f' in {base_cli_error.cli.title}' if base_cli_error.cli is not None else ''}: {base_cli_error.args[0]}",
             *(cli_error.args if coalesce_cli_error_args else ()),
         )
+        return cli_error
 
     def sync_coalesce(
         *args: Annotated[
@@ -114,11 +123,14 @@ def create_sub_cli_coalesce_command(
         except CLIError as cli_error:
             if type(cli_error) is CLIError:
                 replaced = SubCLIError.replaced(cli_error)
-                raise replaced from None
+                fill_cli_error_for_cli_frame(args, replaced)
+                raise replaced from cli_error.__cause__
             else:
-                fill_cli_error_for_sub_cli(args, cli_error=cli_error)
-                raise SubCLIError(
-                    f"The following type of error occurred in the sub-cli: {type(cli_error).__name__}: {cli_error.args[0] if cli_error.args else '...'}"
+                raise fill_cli_error_for_cli_frame(
+                    args,
+                    SubCLIError(
+                        f"The following type of error occurred in the sub-cli: {type(cli_error).__name__}: {cli_error.args[0] if cli_error.args else '...'}"
+                    ),
                 ) from cli_error
 
     async def async_coalesce(
@@ -132,11 +144,14 @@ def create_sub_cli_coalesce_command(
         except CLIError as cli_error:
             if type(cli_error) is CLIError:
                 replaced = SubCLIError.replaced(cli_error)
-                raise replaced from None
+                fill_cli_error_for_cli_frame(args, replaced)
+                raise replaced from cli_error.__cause__
             else:
-                fill_cli_error_for_sub_cli(args, cli_error=cli_error)
-                raise SubCLIError(
-                    f"The following type of error occurred in the sub-cli: {type(cli_error).__name__}: {cli_error.args[0] if cli_error.args else '...'}"
+                raise fill_cli_error_for_cli_frame(
+                    args,
+                    SubCLIError(
+                        f"The following type of error occurred in the sub-cli: {type(cli_error).__name__}: {cli_error.args[0] if cli_error.args else '...'}"
+                    ),
                 ) from cli_error
 
     sync_coalesce.__annotations__["args"] = Annotated[
@@ -200,6 +215,7 @@ def use_sub_cli_coalesce_command[CLIType: CLI](
     annotation_preview: str = "",
     description: str = "",
     coalesce_cli_error_args: bool = False,
+    qualified_name_primary: bool = True,
 ) -> CLIType:
     cli.add_command(
         create_sub_cli_coalesce_command(
@@ -211,6 +227,7 @@ def use_sub_cli_coalesce_command[CLIType: CLI](
             annotation_preview,
             description,
             coalesce_cli_error_args,
+            qualified_name_primary,
         )
     )
     return cli

@@ -14,38 +14,46 @@ from npycli.middlewares.cli_error_printer import (
 from npycli.middlewares.default_command import (
     use_default_on_empty_command_execution_info,
 )
+from npycli.middlewares.flag_before_name import (
+    use_flag_before_name_command_execution_info,
+)
 from npycli.middlewares.global_help import bypass_global_help_flag, use_global_help_flag
 from npycli.middlewares.help_cmd import create_help_command
-from npycli.middlewares.sub_clis import get_sub_clis, use_sub_cli_coalesce_command
+from npycli.middlewares.sub_clis import (
+    UseSubCLIHelpCommand,
+    get_sub_clis,
+    use_sub_cli_coalesce_command,
+)
 from npycli.parameters import Alias, BypassParse, Description
 
 
 def use_common_middlewares[CLIType: CLI](
-    cli: CLIType, preamble: str = "", line_prefix: str = ""
+    cli: CLIType,
+    preamble: str = "",
+    line_prefix: str = "",
+    use_sub_cli_help: bool = True,
 ) -> CLIType:
-    use_default_on_empty_command_execution_info(
-        use_cli_error_printer(
-            use_global_help_flag(
-                cli,
-                create_help_command(
-                    cli, preamble, long_form_default=True, line_prefix=line_prefix
-                ),
+    use_cli_error_printer(
+        use_global_help_flag(
+            cli,
+            create_help_command(
+                cli, preamble, line_prefix=line_prefix, long_form_default=True
             ),
-            raise_on=(EmptyEntriesError,),
-            cli_error_return_value=lambda context, command, error: error,
         ),
-        "help",
+        raise_on=(EmptyEntriesError,),
     )
+    use_flag_before_name_command_execution_info(cli)
     return cli
 
 
 def use_sub_cli_middlewares[CLIType: CLI](cli: CLIType) -> CLIType:
-    @cli.middlewares.register.error()
+    @cli.middlewares.register.error(wrap_before=True)
     def always_raise(
         context: MiddlewareContext, command: npycli.abc.Command | None, error: Exception
     ) -> Any:
         return CLI.RAISE
 
+    use_default_on_empty_command_execution_info(cli, "help")
     return cli
 
 
@@ -134,7 +142,10 @@ def construct_sub_cli_b() -> CLI:
         import apod_manager  # type: ignore
 
         use_sub_cli_coalesce_command(
-            cli_b, use_sub_cli_middlewares(apod_manager.cli.cli), "apod"
+            cli_b,
+            use_sub_cli_middlewares(apod_manager.cli.cli),
+            "apod",
+            help=UseSubCLIHelpCommand(),
         )
     except ImportError:
 
@@ -214,10 +225,14 @@ def main(*args: BypassParse, prompter: bool = False) -> int:
 
     import user_items
 
-    use_sub_cli_coalesce_command(main_cli, construct_sub_cli_a())
-    use_sub_cli_coalesce_command(main_cli, construct_sub_cli_b())
-    use_sub_cli_coalesce_command(main_cli, user_items.cli)
-    use_common_middlewares(main_cli, "The main CLI", " > ")
+    use_sub_cli_coalesce_command(
+        main_cli, construct_sub_cli_a(), help=UseSubCLIHelpCommand()
+    )
+    use_sub_cli_coalesce_command(
+        main_cli, construct_sub_cli_b(), help=UseSubCLIHelpCommand()
+    )
+    use_sub_cli_coalesce_command(main_cli, user_items.cli, help=UseSubCLIHelpCommand())
+    use_common_middlewares(main_cli, "The main CLI", chr(0x251C))
 
     once = main_cli.prompt if prompter else lambda: main_cli.exec(args)
     code: int = 0
