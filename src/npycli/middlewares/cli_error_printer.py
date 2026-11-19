@@ -106,7 +106,11 @@ def create_cli_error_printer(
         """
 
         if context.previous_result is not context.DNE:
-            return context.previous_result
+            if context.previous_result in (CLI.RAISE, CLI.REPLACE):
+                return context.previous_result
+
+            if isinstance(context.previous_result, CLIError):
+                error = context.previous_result
 
         if isinstance(
             error,
